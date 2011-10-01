@@ -1,4 +1,3 @@
-* Add license file
 * Write README
 * Write documentation
 * Optimize performance
