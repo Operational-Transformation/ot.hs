@@ -1,6 +1,6 @@
 * Write README
 * Write documentation
 * Optimize performance
-  * Use Data.Text
+  * Benchmarks
 * Add example and demo
 * Release on Hackage
