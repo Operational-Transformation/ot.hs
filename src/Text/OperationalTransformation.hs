@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module OperationalTransformation
+module Text.OperationalTransformation
   ( Action(..)
   , Operation
   , merge

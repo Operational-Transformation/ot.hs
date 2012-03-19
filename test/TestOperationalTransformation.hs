@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import OperationalTransformation
+import Text.OperationalTransformation
 
 import Test.QuickCheck
 import qualified Data.Text as T
@@ -23,15 +23,15 @@ instance Arbitrary TextOperationPair where
     return $ SOP text operation
 
 -- | has at least 1 element
-arbitraryList :: (Arbitrary a) => Gen [a]
-arbitraryList = liftM2 (:) arbitrary arbitrary
+arbitraryList1 :: (Arbitrary a) => Gen [a]
+arbitraryList1 = liftM2 (:) arbitrary arbitrary
 
 arbitraryOperation :: T.Text -> Gen Operation
-arbitraryOperation "" = oneof [return [], liftM ((:[]) . Insert . fromString) arbitraryList]
+arbitraryOperation "" = oneof [return [], liftM ((:[]) . Insert . fromString) arbitraryList1]
 arbitraryOperation s = do
   len <- choose (1, (min 10 (T.length s)))
   oneof [ liftM ((Skip len):) $ arbitraryOperation (T.drop len s)
-        , do s2 <- liftM2 ((.) (.) (.) fromString (:)) arbitrary arbitrary -- make sure that the text has a length of at least one
+        , do s2 <- liftM fromString arbitraryList1 -- make sure that the text has a length of at least one
              next <- arbitraryOperation s
              return $ (Insert s2):next
         , do let (before, after) = T.splitAt len s
