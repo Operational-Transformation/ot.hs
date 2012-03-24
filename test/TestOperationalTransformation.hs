@@ -9,7 +9,7 @@ import Data.String (fromString)
 import Control.Monad (liftM, liftM2)
 
 instance Arbitrary Action where
-  arbitrary = oneof [ liftM (Skip . (+1) . abs) arbitrary
+  arbitrary = oneof [ liftM (Retain . (+1) . abs) arbitrary
                     , liftM Insert arbitrary
                     , liftM Delete arbitrary
                     ]
@@ -30,7 +30,7 @@ arbitraryOperation :: T.Text -> Gen Operation
 arbitraryOperation "" = oneof [return [], liftM ((:[]) . Insert . fromString) arbitraryList1]
 arbitraryOperation s = do
   len <- choose (1, (min 10 (T.length s)))
-  oneof [ liftM ((Skip len):) $ arbitraryOperation (T.drop len s)
+  oneof [ liftM ((Retain len):) $ arbitraryOperation (T.drop len s)
         , do s2 <- liftM fromString arbitraryList1 -- make sure that the text has a length of at least one
              next <- arbitraryOperation s
              return $ (Insert s2):next
@@ -61,7 +61,7 @@ instance Arbitrary TextConcurrentOperationTriple where
 
 deltaLength :: Operation -> Int
 deltaLength = sum . map len
-  where len (Skip _)   = 0
+  where len (Retain _)   = 0
         len (Insert i) = T.length i
         len (Delete d) = -(T.length d)
 
@@ -76,7 +76,7 @@ prop_merge_well_formed (SOT _ a b) = wellFormed $ merge a b
 
 wellFormed :: Operation -> Bool
 wellFormed = all (not . nullLength)
-  where nullLength (Skip n) = n == 0
+  where nullLength (Retain n) = n == 0
         nullLength (Insert i) = i == ""
         nullLength (Delete d) = d == ""
 
