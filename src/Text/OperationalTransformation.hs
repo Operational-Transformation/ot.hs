@@ -1,17 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Text.OperationalTransformation
-  ( Action(..)
+  ( Action (..)
   , Operation
   , merge
   , apply
-  , simplify
-  , xform
+  , transform
   ) where
 
 import qualified Data.Text as T
 import Data.Monoid (mappend)
-import Control.Arrow (first, second, (***))
 
 data Action = Retain Int
             | Insert T.Text
@@ -20,65 +18,95 @@ data Action = Retain Int
 
 type Operation = [Action]
 
-simplify :: Operation -> Operation
-simplify ((Retain 0):xs) = simplify xs
-simplify ((Insert ""):xs) = simplify xs
-simplify ((Delete ""):xs) = simplify xs
-simplify ((Retain n):(Retain m):xs) = simplify $ (Retain (n+m)):xs
-simplify ((Insert a):(Insert b):xs) = simplify $ (Insert (a `mappend` b)):xs
-simplify ((Delete a):(Delete b):xs) = simplify $ (Delete (a `mappend` b)):xs
-simplify (x:xs) = x:(simplify xs)
-simplify [] = []
-
 haveSamePrefix :: T.Text -> T.Text -> Bool
-haveSamePrefix a b = if T.length a < T.length b then a `T.isPrefixOf` b else b `T.isPrefixOf` a
+haveSamePrefix a b = if T.length a < T.length b then a `T.isPrefixOf` b
+                                                else b `T.isPrefixOf` a
 
-merge :: Operation -> Operation -> Operation
-merge [] [] = []
-merge ((Retain n):as) ((Retain m):bs) | n == m = (Retain n):(merge as bs)
-                                      | n  < m = (Retain n):(merge as ((Retain (m-n)):bs))
-                                      | n  > m = (Retain m):(merge ((Retain (n-m)):as) bs)
-merge ((Retain n):as) ((Insert b):bs) = (Insert b):(merge ((Retain n):as) bs)
-merge ((Retain n):as) ((Delete b):bs) | n == T.length b = (Delete b):(merge as bs)
-                                      | n  < T.length b = let (before, after) = T.splitAt n b in (Delete before):(merge as ((Delete after):bs))
-                                      | otherwise       = (Delete b):(merge ((Retain (n-(T.length b))):as) bs)
-merge ((Insert a):as) ((Retain m):bs) | T.length a == m = (Insert a):(merge as bs)
-                                      | T.length a  < m = (Insert a):(merge as ((Retain (m - T.length a)):bs))
-                                      | otherwise       = let (before, after) = T.splitAt m a in (Insert before):(merge ((Insert after):as) bs)
-merge ((Insert a):as) ((Insert b):bs) = (Insert b):(merge ((Insert a):as) bs)
-merge ((Insert a):as) ((Delete b):bs) | not (haveSamePrefix a b) = error "delete must delete what has been inserted before"
-                                      | T.length a == T.length b = merge as bs
-                                      | T.length a  < T.length b = merge as ((Delete (T.drop (T.length a) b)):bs)
-                                      | otherwise                = merge ((Insert (T.drop (T.length b) a)):as) bs
-merge ((Delete a):as) ((Retain m):bs) = (Delete a):(merge as ((Retain m):bs))
-merge ((Delete a):as) ((Insert b):bs) = (Delete a):(Insert b):(merge as bs)
-merge ((Delete a):as) ((Delete b):bs) = (Delete a):(merge as ((Delete b):bs))
-merge ((Delete a):as) [] = (Delete a):(merge as [])
-merge [] ((Insert b):bs) = (Insert b):(merge [] bs)
+addRetain :: Int -> [Action] -> [Action]
+addRetain n (Retain m : xs) = Retain (n+m) : xs
+addRetain n xs = Retain n : xs
 
-apply :: Operation -> T.Text -> T.Text
-apply ((Retain n):xs) s = let (before, after) = T.splitAt n s in if T.length before == n then before `mappend` apply xs after else error "does not match"
-apply ((Insert i):xs) s = i `mappend` apply xs s
-apply ((Delete d):xs) s = if d `T.isPrefixOf` s then apply xs (T.drop (T.length d) s) else error "does not match"
-apply [] "" = ""
+addInsert :: T.Text -> [Action] -> [Action]
+addInsert s (Insert t : xs) = Insert (t `mappend` s) : xs
+addInsert s xs = Insert s : xs
 
-xform :: Operation -> Operation -> (Operation, Operation)
-xform [] [] = ([], [])
-xform ((Insert a):as) bs = (***) ((Insert a):) ((Retain $ T.length a):) $ xform as bs
-xform as ((Insert b):bs) = (***) ((Retain $ T.length b):) ((Insert b):) $ xform as bs
-xform ((Retain n):as) ((Retain m):bs) | n == m = both ((Retain n):) $ xform as bs
-                                      | n  < m = both ((Retain n):) $ xform as ((Retain (m-n)):bs)
-                                      | n  > m = both ((Retain m):) $ xform ((Retain (n-m)):as) bs
-xform ((Delete a):as) ((Delete b):bs) | not (haveSamePrefix a b) = error "two transformations for the same document must delete the same string when they delete something at the same index"
-                                      | T.length a == T.length b = xform as bs
-                                      | T.length a  < T.length b = xform as ((Delete $ T.drop (T.length a) b):bs)
-                                      | otherwise                = xform ((Delete $ T.drop (T.length b) a):as) bs
-xform ((Retain n):as) ((Delete b):bs) | n == T.length b = second ((Delete b):) $ xform as bs
-                                      | n  < T.length b = let (before, after) = T.splitAt n b in second ((Delete before):) $ xform as ((Delete after):bs)
-                                      | otherwise       = second ((Delete b):) $ xform ((Retain (n-(T.length b))):as) bs
-xform ((Delete a):as) ((Retain m):bs) | T.length a == m = first ((Delete a):) $ xform as bs
-                                      | T.length a  < m = first ((Delete a):) $ xform as ((Retain (m-(T.length a))):bs)
-                                      | otherwise       = let (before, after) = T.splitAt m a in first ((Delete before):) $ xform ((Delete after):as) bs
+addDelete :: T.Text -> [Action] -> [Action]
+addDelete s (Delete t : xs) = Delete (t `mappend` s) : xs
+addDelete s xs = Delete s : xs
 
-both :: (a -> b) -> (a, a) -> (b, b)
-both f = (***) f f
+merge :: Operation -> Operation -> Maybe Operation
+merge o1 o2 = reverse `fmap` loop o1 o2 []
+  where
+    loop [] [] xs = Just xs
+    loop aa@(a:as) bb@(b:bs) xs = case (a, b) of
+      (Delete d, _) -> loop as bb (addDelete d xs)
+      (_, Insert i) -> loop aa bs (addInsert i xs)
+      (Retain n, Retain m) -> case compare n m of
+        LT -> loop as (Retain (m-n) : bs) (addRetain n xs)
+        EQ -> loop as bs (addRetain n xs)
+        GT -> loop (Retain (n-m) : as) bs (addRetain m xs)
+      (Retain n, Delete d) -> case compare n (T.length d) of
+        LT -> let (before, after) = T.splitAt n d
+              in loop as (Delete after : bs) (addDelete before xs)
+        EQ -> loop as bs (addDelete d xs)
+        GT -> loop (Retain (n - T.length d) : as) bs (addDelete d xs)
+      (Insert i, Retain m) -> case compare (T.length i) m of
+        LT -> loop as (Retain (m - T.length i) : bs) (addInsert i xs)
+        EQ -> loop as bs (addInsert i xs)
+        GT -> let (before, after) = T.splitAt m i
+              in loop (Insert after : as) bs (addInsert before xs)
+      (Insert i, Delete d) -> if not (haveSamePrefix i d)
+        then Nothing
+        else case compare (T.length i) (T.length d) of
+          LT -> loop as (Delete (T.drop (T.length i) d) : bs) xs
+          EQ -> loop as bs xs
+          GT -> loop (Insert (T.drop (T.length d) i) : as) bs xs
+    loop (Delete d : as) [] xs = loop as [] (addDelete d xs)
+    loop [] (Insert i : bs) xs = loop [] bs (addInsert i xs)
+    loop _ _ _ = Nothing
+
+apply :: Operation -> T.Text -> Maybe T.Text
+apply operation input = loop operation input ""
+  where
+    loop [] "" ot = Just ot
+    loop (op:ops) it ot = case op of
+      Retain r -> if T.length it < r
+        then Nothing
+        else let (before, after) = T.splitAt r it
+             in loop ops after (ot `mappend` before)
+      Insert i -> loop ops it (ot `mappend` i)
+      Delete d -> if not (d `T.isPrefixOf` it)
+        then Nothing
+        else loop ops (T.drop (T.length d) it) ot
+    loop _ _ _ = Nothing
+
+transform :: Operation -> Operation -> Maybe (Operation, Operation)
+transform o1 o2 = (\(q, w) -> (reverse q, reverse w)) `fmap` loop o1 o2 [] []
+  where
+    loop [] [] xs ys = Just (xs, ys)
+    loop aa@(a:as) bb@(b:bs) xs ys = case (a, b) of
+      (Insert i, _) -> loop as bb (addInsert i xs) (addRetain (T.length i) ys)
+      (_, Insert i) -> loop aa bs (addRetain (T.length i) xs) (addInsert i ys)
+      (Retain n, Retain m) -> case compare n m of
+        LT -> loop as (Retain (m-n) : bs) (addRetain n xs) (addRetain n ys)
+        EQ -> loop as bs (addRetain n xs) (addRetain n ys)
+        GT -> loop (Retain (n-m) : as) bs (addRetain m xs) (addRetain m ys)
+      (Delete d, Delete e) -> if not (haveSamePrefix d e)
+        then Nothing
+        else case compare (T.length d) (T.length e) of
+          LT -> loop as (Delete (T.drop (T.length d) e) : bs) xs ys
+          EQ -> loop as bs xs ys
+          GT -> loop (Delete (T.drop (T.length e) d) : as) bs xs ys
+      (Retain r, Delete d) -> case compare r (T.length d) of
+        LT -> let (before, after) = T.splitAt r d
+              in loop as (Delete after : bs) xs (addDelete before ys)
+        EQ -> loop as bs xs (addDelete d ys)
+        GT -> loop (Retain (r - T.length d) : as) bs xs (addDelete d ys)
+      (Delete d, Retain r) -> case compare (T.length d) r of
+        LT -> loop as (Retain (r - T.length d) : bs) (addDelete d xs) ys
+        EQ -> loop as bs (addDelete d xs) ys
+        GT -> let (before, after) = T.splitAt r d
+              in loop (Delete after : as) bs (addDelete before xs) ys
+    loop [] (Insert i : bs) xs ys = loop [] bs (addRetain (T.length i) xs) (addInsert i ys)
+    loop (Insert i : as) [] xs ys = loop as [] (addInsert i xs) (addRetain (T.length i) ys)
+    loop _ _ _ _ = Nothing

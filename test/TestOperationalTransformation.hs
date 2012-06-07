@@ -5,6 +5,7 @@ import Text.OperationalTransformation
 import Test.QuickCheck
 import qualified Data.Text as T
 import Data.String (fromString)
+import Data.Maybe (fromJust)
 
 import Control.Monad (liftM, liftM2)
 
@@ -29,8 +30,8 @@ arbitraryList1 = liftM2 (:) arbitrary arbitrary
 arbitraryOperation :: T.Text -> Gen Operation
 arbitraryOperation "" = oneof [return [], liftM ((:[]) . Insert . fromString) arbitraryList1]
 arbitraryOperation s = do
-  len <- choose (1, (min 10 (T.length s)))
-  oneof [ liftM ((Retain len):) $ arbitraryOperation (T.drop len s)
+  len <- choose (1, min 10 (T.length s))
+  oneof [ liftM (Retain len :) $ arbitraryOperation (T.drop len s)
         , do s2 <- liftM fromString arbitraryList1 -- make sure that the text has a length of at least one
              next <- arbitraryOperation s
              return $ (Insert s2):next
@@ -44,7 +45,7 @@ data TextOperationTriple = SOT T.Text Operation Operation deriving (Show)
 instance Arbitrary TextOperationTriple where
   arbitrary = do
     (SOP text operation1) <- arbitrary
-    operation2 <- arbitraryOperation (apply operation1 text)
+    operation2 <- arbitraryOperation (fromJust $ apply operation1 text)
     return $ SOT text operation1 operation2
 
 data TextConcurrentOperationTriple = SCOT T.Text Operation Operation deriving (Show)
@@ -66,13 +67,19 @@ deltaLength = sum . map len
         len (Delete d) = -(T.length d)
 
 prop_length :: TextOperationPair -> Bool
-prop_length (SOP str op) = T.length (apply op str) == T.length str + deltaLength op
+prop_length (SOP str op) = case apply op str of
+  Nothing -> False
+  Just str' -> T.length str' == T.length str + deltaLength op
 
 prop_merge_length :: TextOperationTriple -> Bool
-prop_merge_length (SOT _ a b) = deltaLength a + deltaLength b == deltaLength (merge a b)
+prop_merge_length (SOT _ a b) = case merge a b of
+  Nothing -> False
+  Just ab -> deltaLength a + deltaLength b == deltaLength ab
 
 prop_merge_well_formed :: TextOperationTriple -> Bool
-prop_merge_well_formed (SOT _ a b) = wellFormed $ merge a b
+prop_merge_well_formed (SOT _ a b) = case merge a b of
+  Nothing -> False
+  Just ab -> wellFormed ab
 
 wellFormed :: Operation -> Bool
 wellFormed = all (not . nullLength)
@@ -81,15 +88,21 @@ wellFormed = all (not . nullLength)
         nullLength (Delete d) = d == ""
 
 prop_merge_apply :: TextOperationTriple -> Bool
-prop_merge_apply (SOT s a b) = apply b (apply a s) == apply (merge a b) s
+prop_merge_apply (SOT s a b) = case (apply b `fmap` (apply a s), (\ab -> apply ab s) `fmap`  merge a b) of
+  (Just str', Just str'') -> str' == str''
+  _ -> False
 
 prop_xform_length :: TextConcurrentOperationTriple -> Bool
-prop_xform_length (SCOT _ a b) = let (a', b') = xform a b
-                                 in deltaLength a + deltaLength b' == deltaLength b + deltaLength a'
+prop_xform_length (SCOT _ a b) = case transform a b of
+  Nothing -> False
+  Just (a', b') -> deltaLength a + deltaLength b' == deltaLength b + deltaLength a'
 
 prop_xform_apply :: TextConcurrentOperationTriple -> Bool
-prop_xform_apply (SCOT s a b) = let (a', b') = xform a b
-                                in (apply b' . apply a $ s) == (apply a' . apply b $ s)
+prop_xform_apply (SCOT s a b) = case transform a b of
+  Nothing -> False
+  Just (a', b') -> case (apply b' `fmap` apply a s, apply a' `fmap` apply b s) of
+    (Just s', Just s'') -> s' == s''
+    _ -> False
 
 main :: IO ()
 main = do
