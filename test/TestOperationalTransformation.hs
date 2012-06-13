@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.OperationalTransformation
-import Text.OperationalTransformation
+import Control.OperationalTransformation.Text
 
 import Test.QuickCheck
 import qualified Data.Text as T

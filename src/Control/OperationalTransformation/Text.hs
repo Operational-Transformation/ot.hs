@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, MultiParamTypeClasses #-}
 
-module Text.OperationalTransformation
+module Control.OperationalTransformation.Text
   ( Action (..)
   , TextOperation (..)
   ) where
