@@ -2,6 +2,7 @@
 
 import Control.OperationalTransformation
 import Control.OperationalTransformation.Text
+import Control.OperationalTransformation.Properties
 
 import Test.QuickCheck
 import qualified Data.Text as T
@@ -21,15 +22,15 @@ data TextOperationPair = SOP T.Text TextOperation deriving (Show)
 instance Arbitrary TextOperationPair where
   arbitrary = do
     text <- arbitrary
-    operation <- arbitraryOperation text
+    operation <- genOperation text
     return $ SOP text operation
 
 -- | has at least 1 element
 arbitraryList1 :: (Arbitrary a) => Gen [a]
 arbitraryList1 = liftM2 (:) arbitrary arbitrary
 
-arbitraryOperation :: T.Text -> Gen TextOperation
-arbitraryOperation = liftM TextOperation . gen
+genOperation :: T.Text -> Gen TextOperation
+genOperation = liftM TextOperation . gen
   where
     gen "" = oneof [return [], liftM ((:[]) . Insert . fromString) arbitraryList1]
     gen s = do
@@ -48,7 +49,7 @@ data TextOperationTriple = SOT T.Text TextOperation TextOperation deriving (Show
 instance Arbitrary TextOperationTriple where
   arbitrary = do
     (SOP text operation1) <- arbitrary
-    operation2 <- arbitraryOperation (fromJust $ apply operation1 text)
+    operation2 <- genOperation (fromJust $ apply operation1 text)
     return $ SOT text operation1 operation2
 
 data TextConcurrentOperationTriple = SCOT T.Text TextOperation TextOperation deriving (Show)
@@ -59,8 +60,8 @@ instance Arbitrary T.Text where
 instance Arbitrary TextConcurrentOperationTriple where
   arbitrary = do
     text <- arbitrary
-    operationA <- arbitraryOperation text
-    operationB <- arbitraryOperation text
+    operationA <- genOperation text
+    operationB <- genOperation text
     return $ SCOT text operationA operationB
 
 deltaLength :: TextOperation -> Int
@@ -90,28 +91,16 @@ wellFormed (TextOperation ops) = all (not . nullLength) ops
         nullLength (Insert i) = i == ""
         nullLength (Delete d) = d == ""
 
-prop_compose_apply :: TextOperationTriple -> Bool
-prop_compose_apply (SOT s a b) = case (apply b `fmap` (apply a s), (\ab -> apply ab s) `fmap`  compose a b) of
-  (Just str', Just str'') -> str' == str''
-  _ -> False
-
-prop_xform_length :: TextConcurrentOperationTriple -> Bool
-prop_xform_length (SCOT _ a b) = case transform a b of
+prop_transform_length :: TextConcurrentOperationTriple -> Bool
+prop_transform_length (SCOT _ a b) = case transform a b of
   Nothing -> False
   Just (a', b') -> deltaLength a + deltaLength b' == deltaLength b + deltaLength a'
 
-prop_xform_apply :: TextConcurrentOperationTriple -> Bool
-prop_xform_apply (SCOT s a b) = case transform a b of
-  Nothing -> False
-  Just (a', b') -> case (apply b' `fmap` apply a s, apply a' `fmap` apply b s) of
-    (Just s', Just s'') -> s' == s''
-    _ -> False
-
 main :: IO ()
 main = do
+  quickCheck $ prop_compose_apply genOperation
+  quickCheck $ prop_transform_apply genOperation
   quickCheck prop_length
   quickCheck prop_compose_length
   quickCheck prop_compose_well_formed
-  quickCheck prop_compose_apply
-  quickCheck prop_xform_length
-  quickCheck prop_xform_apply
+  quickCheck prop_transform_length
