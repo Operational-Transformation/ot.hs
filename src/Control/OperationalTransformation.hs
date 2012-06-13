@@ -6,6 +6,8 @@ module Control.OperationalTransformation
   , OTSystem (..)
   ) where
 
+import Control.Monad (foldM)
+
 class OTOperation op where
   transform :: op -> op -> Maybe (op, op)
 
@@ -15,38 +17,26 @@ class (OTOperation op) => OTComposableOperation op where
 class (OTOperation op) => OTSystem doc op where
   apply :: op -> doc -> Maybe doc
 
-data OpList op = SingleOp op
-               | ConsecutiveOps op (OpList op)
-               deriving (Show, Read, Eq)
-
-instance (OTOperation op) => OTOperation (OpList op) where
+instance (OTOperation op) => OTOperation [op] where
   transform = transformList2
     where
-      transformList1 o (SingleOp p) = do
-        (o', p') <- transform o p
-        return (o', SingleOp p')
-      transformList1 o (ConsecutiveOps p ps) = do
+      transformList1 o [] = return (o, [])
+      transformList1 o (p:ps) = do
         (o', p') <- transform o p
         (o'', ps') <- transformList1 o' ps
-        return (o'', ConsecutiveOps p' ps')
+        return (o'', p':ps')
 
-      transformList2 (SingleOp o) ps = do
-        (o', ps') <- transformList1 o ps
-        return (SingleOp o', ps')
-      transformList2 (ConsecutiveOps o os) ps = do
+      transformList2 [] ps = return ([], ps)
+      transformList2 (o:os) ps = do
         (o', ps') <- transformList1 o ps
         (os', ps'') <- transformList2 os ps'
-        return (ConsecutiveOps o' os', ps'')
+        return (o':os', ps'')
 
-instance (OTOperation op) => OTComposableOperation (OpList op) where
-  compose a b = Just $ loop a b
-    where
-      loop (SingleOp op) ops = ConsecutiveOps op ops
-      loop (ConsecutiveOps op ops) ops2 = ConsecutiveOps op $ loop ops ops2
+instance (OTOperation op) => OTComposableOperation [op] where
+  compose a b = Just $ a ++ b
 
-instance (OTSystem doc op) => OTSystem doc (OpList op) where
-  apply (SingleOp op) doc = apply op doc
-  apply (ConsecutiveOps op ops) doc = apply op doc >>= apply ops
+instance (OTSystem doc op) => OTSystem doc [op] where
+  apply = flip $ foldM $ flip apply
 
 
 instance (OTOperation a, OTOperation b) => OTOperation (a, b) where
