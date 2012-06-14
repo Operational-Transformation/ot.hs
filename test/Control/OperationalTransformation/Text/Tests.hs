@@ -1,15 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+module Control.OperationalTransformation.Text.Tests
+  ( tests
+  ) where
+
 import Control.OperationalTransformation
 import Control.OperationalTransformation.Text
 import Control.OperationalTransformation.Properties
 
 import Test.QuickCheck
 import Test.QuickCheck.Property (rejected)
+import Test.Framework
+import Test.Framework.Providers.QuickCheck2 (testProperty)
+
 import qualified Data.Text as T
 import Data.String (fromString)
-
-import Control.Monad (liftM, liftM2, join)
+import Control.Monad (liftM, join)
 
 instance Arbitrary T.Text where
   arbitrary = liftM fromString arbitrary
@@ -76,11 +82,12 @@ wellFormed (TextOperation ops) = all (not . nullLength) ops
         nullLength (Insert i) = i == ""
         nullLength (Delete d) = d == ""
 
-main :: IO ()
-main = do
-  quickCheck $ prop_compose_apply genOperation
-  quickCheck $ prop_transform_apply genOperation
-  quickCheck prop_apply_length
-  quickCheck prop_compose_length
-  quickCheck prop_compose_well_formed
-  quickCheck prop_transform_well_formed
+tests :: Test
+tests = testGroup "Control.OperationalTransformation.Text.Tests"
+  [ testProperty "prop_compose_apply" $ prop_compose_apply genOperation
+  , testProperty "prop_transform_apply" $ prop_transform_apply genOperation
+  , testProperty "prop_apply_length" prop_apply_length
+  , testProperty "prop_compose_length" prop_compose_length
+  , testProperty "prop_compose_well_formed" prop_compose_well_formed
+  , testProperty "prop_transform_well_formed" prop_transform_well_formed
+  ]
