@@ -9,9 +9,9 @@ import Control.OperationalTransformation
 import qualified Data.Text as T
 import Data.Monoid (mappend)
 
-data Action = Retain Int
-            | Insert T.Text
-            | Delete T.Text
+data Action = Retain !Int
+            | Insert !T.Text
+            | Delete !T.Text
             deriving (Eq, Read, Show)
 
 newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show)

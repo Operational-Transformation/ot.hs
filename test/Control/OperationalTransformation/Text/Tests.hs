@@ -2,6 +2,7 @@
 
 module Control.OperationalTransformation.Text.Tests
   ( tests
+  , genOperation
   ) where
 
 import Control.OperationalTransformation
