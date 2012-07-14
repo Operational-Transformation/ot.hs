@@ -67,15 +67,15 @@ prop_client_server genOp = join $ do
   (server', clients') <- simulate numActions server clients
   return $ if not (all isSynchronized clients')
     then property $ failed { reason = "some clients are not synchronized" }
-    else let ServerState _ doc _ = server'
-         in if all ((== doc) . clientDoc) clients'
+    else let ServerState _ doc' _ = server'
+         in if all ((== doc') . clientDoc) clients'
               then property True
               else property $ failed { reason = "client documents did not converge" }
 
   where
     numClients, numActions :: Int
     numClients = 2
-    numActions = 5
+    numActions = 100
 
     firstRevision = 0
     createClients doc = map $ \n ->
@@ -102,7 +102,7 @@ prop_client_server genOp = join $ do
               clients'' = broadcast op' clients'
           return (server', clients'')
         _ | n < 0 -> return (server, clients)
-        _ | otherwise -> do
+          | otherwise -> do
           client' <- editClient client
           return (server, replace clientN  client' clients)
       if n > 0 || any (\c -> canReceive c || canSend c) clients'
