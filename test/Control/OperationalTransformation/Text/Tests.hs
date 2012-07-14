@@ -24,23 +24,22 @@ instance Arbitrary T.Text where
 genOperation :: T.Text -> Gen TextOperation
 genOperation = liftM TextOperation . gen
   where
-    gen "" = oneof [return [], liftM ((:[]) . Insert . fromString) (listOf1 arbitrary)]
+    gen "" = oneof [return [], liftM ((:[]) . Insert) (arbitraryText maxLength)]
     gen s = do
-      len <- choose (1, min 10 (T.length s))
+      len <- choose (1, min maxLength (T.length s))
       oneof [ liftM (Retain len :) $ gen (T.drop len s)
-            , do s2 <- liftM fromString (listOf1 arbitrary)
-                 next <- gen s
-                 return $ (Insert s2):next
-            , do let (before, after) = T.splitAt len s
-                 next <- gen after
-                 return $ (Delete before):next
+            , do s2 <- arbitraryText len
+                 liftM (Insert s2 :) $ gen s
+            , liftM (Delete len :) $ gen (T.drop len s)
             ]
+    maxLength = 32
+    arbitraryText n = liftM (fromString . take n) $ listOf1 arbitrary
 
 deltaLength :: TextOperation -> Int
 deltaLength (TextOperation ops) = sum (map len ops)
   where len (Retain _)   = 0
         len (Insert i) = T.length i
-        len (Delete d) = -(T.length d)
+        len (Delete d) = -d
 
 prop_apply_length :: T.Text -> Property
 prop_apply_length doc = join $ do
@@ -81,7 +80,7 @@ wellFormed :: TextOperation -> Bool
 wellFormed (TextOperation ops) = all (not . nullLength) ops
   where nullLength (Retain n) = n == 0
         nullLength (Insert i) = i == ""
-        nullLength (Delete d) = d == ""
+        nullLength (Delete d) = d == 0
 
 tests :: Test
 tests = testGroup "Control.OperationalTransformation.Text.Tests"

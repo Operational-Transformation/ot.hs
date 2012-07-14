@@ -11,14 +11,10 @@ import Data.Monoid (mappend)
 
 data Action = Retain !Int
             | Insert !T.Text
-            | Delete !T.Text
+            | Delete !Int
             deriving (Eq, Read, Show)
 
 newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show)
-
-haveSamePrefix :: T.Text -> T.Text -> Bool
-haveSamePrefix a b = if T.length a < T.length b then a `T.isPrefixOf` b
-                                                else b `T.isPrefixOf` a
 
 addRetain :: Int -> [Action] -> [Action]
 addRetain n (Retain m : xs) = Retain (n+m) : xs
@@ -28,9 +24,9 @@ addInsert :: T.Text -> [Action] -> [Action]
 addInsert s (Insert t : xs) = Insert (t `mappend` s) : xs
 addInsert s xs = Insert s : xs
 
-addDelete :: T.Text -> [Action] -> [Action]
-addDelete s (Delete t : xs) = Delete (t `mappend` s) : xs
-addDelete s xs = Delete s : xs
+addDelete :: Int -> [Action] -> [Action]
+addDelete n (Delete m : xs) = Delete (n+m) : xs
+addDelete n xs = Delete n : xs
 
 instance OTOperation TextOperation where
   transform (TextOperation o1) (TextOperation o2) = both (TextOperation . reverse) `fmap` loop o1 o2 [] []
@@ -46,22 +42,18 @@ instance OTOperation TextOperation where
           LT -> loop as (Retain (m-n) : bs) (addRetain n xs) (addRetain n ys)
           EQ -> loop as bs (addRetain n xs) (addRetain n ys)
           GT -> loop (Retain (n-m) : as) bs (addRetain m xs) (addRetain m ys)
-        (Delete d, Delete e) -> if not (haveSamePrefix d e)
-          then Nothing
-          else case compare (T.length d) (T.length e) of
-            LT -> loop as (Delete (T.drop (T.length d) e) : bs) xs ys
-            EQ -> loop as bs xs ys
-            GT -> loop (Delete (T.drop (T.length e) d) : as) bs xs ys
-        (Retain r, Delete d) -> case compare r (T.length d) of
-          LT -> let (before, after) = T.splitAt r d
-                in loop as (Delete after : bs) xs (addDelete before ys)
+        (Delete n, Delete m) -> case compare n m of
+          LT -> loop as (Delete (m-n) : bs) xs ys
+          EQ -> loop as bs xs ys
+          GT -> loop (Delete (n-m) : as) bs xs ys
+        (Retain r, Delete d) -> case compare r d of
+          LT -> loop as (Delete (d-r) : bs) xs (addDelete r ys)
           EQ -> loop as bs xs (addDelete d ys)
-          GT -> loop (Retain (r - T.length d) : as) bs xs (addDelete d ys)
-        (Delete d, Retain r) -> case compare (T.length d) r of
-          LT -> loop as (Retain (r - T.length d) : bs) (addDelete d xs) ys
+          GT -> loop (Retain (r-d) : as) bs xs (addDelete d ys)
+        (Delete d, Retain r) -> case compare d r of
+          LT -> loop as (Retain (r-d) : bs) (addDelete d xs) ys
           EQ -> loop as bs (addDelete d xs) ys
-          GT -> let (before, after) = T.splitAt r d
-                in loop (Delete after : as) bs (addDelete before xs) ys
+          GT -> loop (Delete (d-r) : as) bs (addDelete r xs) ys
       loop [] (Insert i : bs) xs ys = loop [] bs (addRetain (T.length i) xs) (addInsert i ys)
       loop (Insert i : as) [] xs ys = loop as [] (addInsert i xs) (addRetain (T.length i) ys)
       loop _ _ _ _ = Nothing
@@ -77,22 +69,19 @@ instance OTComposableOperation TextOperation where
           LT -> loop as (Retain (m-n) : bs) (addRetain n xs)
           EQ -> loop as bs (addRetain n xs)
           GT -> loop (Retain (n-m) : as) bs (addRetain m xs)
-        (Retain n, Delete d) -> case compare n (T.length d) of
-          LT -> let (before, after) = T.splitAt n d
-                in loop as (Delete after : bs) (addDelete before xs)
+        (Retain r, Delete d) -> case compare r d of
+          LT -> loop as (Delete (d-r) : bs) (addDelete r xs)
           EQ -> loop as bs (addDelete d xs)
-          GT -> loop (Retain (n - T.length d) : as) bs (addDelete d xs)
+          GT -> loop (Retain (r-d) : as) bs (addDelete d xs)
         (Insert i, Retain m) -> case compare (T.length i) m of
           LT -> loop as (Retain (m - T.length i) : bs) (addInsert i xs)
           EQ -> loop as bs (addInsert i xs)
           GT -> let (before, after) = T.splitAt m i
                 in loop (Insert after : as) bs (addInsert before xs)
-        (Insert i, Delete d) -> if not (haveSamePrefix i d)
-          then Nothing
-          else case compare (T.length i) (T.length d) of
-            LT -> loop as (Delete (T.drop (T.length i) d) : bs) xs
-            EQ -> loop as bs xs
-            GT -> loop (Insert (T.drop (T.length d) i) : as) bs xs
+        (Insert i, Delete d) -> case compare (T.length i) d of
+          LT -> loop as (Delete (d - T.length i) : bs) xs
+          EQ -> loop as bs xs
+          GT -> loop (Insert (T.drop d i) : as) bs xs
       loop (Delete d : as) [] xs = loop as [] (addDelete d xs)
       loop [] (Insert i : bs) xs = loop [] bs (addInsert i xs)
       loop _ _ _ = Nothing
@@ -107,7 +96,7 @@ instance OTSystem T.Text TextOperation where
           else let (before, after) = T.splitAt r it
                in loop ops after (ot `mappend` before)
         Insert i -> loop ops it (ot `mappend` i)
-        Delete d -> if not (d `T.isPrefixOf` it)
+        Delete d -> if d > T.length it
           then Nothing
-          else loop ops (T.drop (T.length d) it) ot
+          else loop ops (T.drop d it) ot
       loop _ _ _ = Nothing
