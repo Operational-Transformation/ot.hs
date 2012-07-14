@@ -21,9 +21,9 @@ applyOperation (ServerState rev doc ops) oprev op = (op', ServerState (rev+1) do
       then error "unknown revision number"
       else take (fromInteger $ rev - oprev) ops
     transformFst a b = case transform a b of
-      Nothing -> error "transform failed"
-      Just (a', _) -> a'
+      Left err -> error $ "transform failed: " ++ err
+      Right (a', _) -> a'
     op' = foldr (flip transformFst) op concurrentOps
     doc' = case apply op' doc of
-      Nothing -> error "apply failed"
-      Just d -> d
+      Left err -> error $ "apply failed: " ++ err
+      Right d -> d

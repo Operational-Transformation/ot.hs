@@ -34,7 +34,7 @@ instance OTOperation TextOperation where
       both :: (a -> b) -> (a, a) -> (b, b)
       both f (a, b) = (f a, f b)
 
-      loop [] [] xs ys = Just (xs, ys)
+      loop [] [] xs ys = Right (xs, ys)
       loop aa@(a:as) bb@(b:bs) xs ys = case (a, b) of
         (Insert i, _) -> loop as bb (addInsert i xs) (addRetain (T.length i) ys)
         (_, Insert i) -> loop aa bs (addRetain (T.length i) xs) (addInsert i ys)
@@ -56,12 +56,12 @@ instance OTOperation TextOperation where
           GT -> loop (Delete (d-r) : as) bs (addDelete r xs) ys
       loop [] (Insert i : bs) xs ys = loop [] bs (addRetain (T.length i) xs) (addInsert i ys)
       loop (Insert i : as) [] xs ys = loop as [] (addInsert i xs) (addRetain (T.length i) ys)
-      loop _ _ _ _ = Nothing
+      loop _ _ _ _ = Left "the operations couldn't be transformed because they haven't been applied to the same document"
 
 instance OTComposableOperation TextOperation where
   compose (TextOperation o1) (TextOperation o2) = (TextOperation . reverse) `fmap` loop o1 o2 []
     where
-      loop [] [] xs = Just xs
+      loop [] [] xs = Right xs
       loop aa@(a:as) bb@(b:bs) xs = case (a, b) of
         (Delete d, _) -> loop as bb (addDelete d xs)
         (_, Insert i) -> loop aa bs (addInsert i xs)
@@ -84,19 +84,19 @@ instance OTComposableOperation TextOperation where
           GT -> loop (Insert (T.drop d i) : as) bs xs
       loop (Delete d : as) [] xs = loop as [] (addDelete d xs)
       loop [] (Insert i : bs) xs = loop [] bs (addInsert i xs)
-      loop _ _ _ = Nothing
+      loop _ _ _ = Left "the operations couldn't be composed since their lengths don't match"
 
 instance OTSystem T.Text TextOperation where
   apply (TextOperation actions) input = loop actions input ""
     where
-      loop [] "" ot = Just ot
+      loop [] "" ot = Right ot
       loop (op:ops) it ot = case op of
         Retain r -> if T.length it < r
-          then Nothing
+          then Left "operation can't be applied to the document: operation is longer than the text"
           else let (before, after) = T.splitAt r it
                in loop ops after (ot `mappend` before)
         Insert i -> loop ops it (ot `mappend` i)
         Delete d -> if d > T.length it
-          then Nothing
+          then Left "operation can't be applied to the document: operation is longer than the text"
           else loop ops (T.drop d it) ot
-      loop _ _ _ = Nothing
+      loop _ _ _ = Left "operation can't be applied to the document: text is longer than the operation"

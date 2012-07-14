@@ -7,15 +7,16 @@ module Control.OperationalTransformation
   ) where
 
 import Control.Monad (foldM)
+import Control.Monad.Instances ()
 
 class OTOperation op where
-  transform :: op -> op -> Maybe (op, op)
+  transform :: op -> op -> Either String (op, op)
 
 class (OTOperation op) => OTComposableOperation op where
-  compose :: op -> op -> Maybe op
+  compose :: op -> op -> Either String op
 
 class (OTOperation op) => OTSystem doc op where
-  apply :: op -> doc -> Maybe doc
+  apply :: op -> doc -> Either String doc
 
 instance (OTOperation op) => OTOperation [op] where
   transform = transformList2
@@ -33,7 +34,7 @@ instance (OTOperation op) => OTOperation [op] where
         return (o':os', ps'')
 
 instance (OTOperation op) => OTComposableOperation [op] where
-  compose a b = Just $ a ++ b
+  compose a b = return $ a ++ b
 
 instance (OTSystem doc op) => OTSystem doc [op] where
   apply = flip $ foldM $ flip apply

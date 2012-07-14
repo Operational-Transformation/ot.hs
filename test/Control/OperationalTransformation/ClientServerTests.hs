@@ -31,15 +31,15 @@ data ExtendedOperation op = ExtendedOperation !ClientId !Revision !op
 
 instance (OTOperation op) => OTOperation (ExtendedOperation op) where
   transform (ExtendedOperation cida reva opa) (ExtendedOperation cidb revb opb)
-    | cida == cidb = Nothing
+    | cida == cidb = Left "operations can't be transformed since they originate from the same client"
     | otherwise    = case transform opa opb of
-        Nothing -> Nothing
-        Just (a', b') -> Just (ExtendedOperation cida (reva+1) a', ExtendedOperation cidb (revb+1) b')
+        Left err -> Left err
+        Right (a', b') -> Right (ExtendedOperation cida (reva+1) a', ExtendedOperation cidb (revb+1) b')
 
 instance (OTComposableOperation op) => OTComposableOperation (ExtendedOperation op) where
   compose (ExtendedOperation cid rev a) (ExtendedOperation _ _ b) = case compose a b of
-    Nothing -> Nothing
-    Just ab -> Just $ ExtendedOperation cid rev ab
+    Left err -> Left err
+    Right ab -> Right $ ExtendedOperation cid rev ab
 
 instance (OTSystem doc op) => OTSystem doc (ExtendedOperation op) where
   apply (ExtendedOperation _ _ op) doc = apply op doc
@@ -127,8 +127,8 @@ prop_client_server genOp = join $ do
         in case action of
           NoAction -> client'
           ApplyOperation op -> case apply op (clientDoc client') of
-            Nothing -> error "apply failed"
-            Just doc' -> client' { clientDoc = doc' }
+            Left err -> error $ "apply failed: " ++ err
+            Right doc' -> client' { clientDoc = doc' }
           SendOperation op -> client' { clientSendQueue = appendQueue op (clientSendQueue client') }
 
     sendClient client = case clientSendQueue client of
@@ -138,13 +138,16 @@ prop_client_server genOp = join $ do
     editClient client = do
       op <- genOp $ clientDoc client
       let eop = ExtendedOperation (clientId client) (nextRevision client) op
-          doc' = fromJust $ apply eop $ clientDoc client
+          doc' = fromRight $ apply eop $ clientDoc client
           (action, state') = applyClient (clientState client) eop
           client' = client { clientState = state', clientDoc = doc' }
       return $ case action of
         ApplyOperation _ -> error "shouldn't happen"
         NoAction -> client'
         SendOperation eop' -> client' { clientSendQueue = appendQueue eop' (clientSendQueue client) }
+
+    fromRight (Right a) = a
+    fromRight (Left err) = error err
 
     receiveServer server eo@(ExtendedOperation _ rev _) = applyOperation server rev eo
 

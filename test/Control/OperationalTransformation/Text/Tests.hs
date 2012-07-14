@@ -45,36 +45,36 @@ prop_apply_length :: T.Text -> Property
 prop_apply_length doc = join $ do
   op <- genOperation doc
   return . property $ case apply op doc of
-    Nothing -> False
-    Just str' -> T.length str' == T.length doc + deltaLength op
+    Left _ -> False
+    Right str' -> T.length str' == T.length doc + deltaLength op
 
 prop_compose_length :: T.Text -> Property
 prop_compose_length doc = join $ do
   a <- genOperation doc
   case apply a doc of
-    Nothing -> return $ property rejected
-    Just doc' -> do
+    Left _ -> return $ property rejected
+    Right doc' -> do
       b <- genOperation doc'
       return . property $ case compose a b of
-        Nothing -> False
-        Just ab -> deltaLength a + deltaLength b == deltaLength ab
+        Left _ -> False
+        Right ab -> deltaLength a + deltaLength b == deltaLength ab
 
 prop_compose_well_formed :: T.Text -> Property
 prop_compose_well_formed doc = join $ fmap property $ do
   a <- genOperation doc
-  let Just doc' = apply a doc
+  let Right doc' = apply a doc
   b <- genOperation doc'
   return $ case compose a b of
-    Nothing -> False
-    Just ab -> wellFormed ab
+    Left _ -> False
+    Right ab -> wellFormed ab
 
 prop_transform_well_formed :: T.Text -> Property
 prop_transform_well_formed doc = join $ fmap property $ do
   a <- genOperation doc
   b <- genOperation doc
   return $ case transform a b of
-    Nothing -> False
-    Just (a', b') -> wellFormed a' && wellFormed b'
+    Left _ -> False
+    Right (a', b') -> wellFormed a' && wellFormed b'
 
 wellFormed :: TextOperation -> Bool
 wellFormed (TextOperation ops) = all (not . nullLength) ops
