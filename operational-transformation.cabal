@@ -35,7 +35,7 @@ Library
   -- Other-modules:       
 
 Test-suite tests
-  Ghc-options:         -Wall
+  Ghc-options:         -Wall -rtsopts
   Hs-source-dirs:      src test
   type:                exitcode-stdio-1.0
   main-is:             TestSuite.hs
