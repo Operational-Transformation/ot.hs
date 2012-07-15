@@ -22,25 +22,25 @@ initialClientState :: ClientState op
 initialClientState = ClientSynchronized
 
 applyClient :: (OTComposableOperation op)
-            => ClientState op -> op -> (ClientAction op, ClientState op)
-applyClient ClientSynchronized op = (SendOperation op, ClientWaiting op)
-applyClient (ClientWaiting w) op = (NoAction, ClientWaitingWithBuffer w op)
+            => ClientState op -> op -> Either String (ClientAction op, ClientState op)
+applyClient ClientSynchronized op = Right (SendOperation op, ClientWaiting op)
+applyClient (ClientWaiting w) op = Right (NoAction, ClientWaitingWithBuffer w op)
 applyClient (ClientWaitingWithBuffer w b) op = case compose b op of
-  Left err -> error $ "operations couldn't be composed: " ++ err
-  Right b' -> (NoAction, ClientWaitingWithBuffer w b')
+  Left err -> Left $ "operations couldn't be composed: " ++ err
+  Right b' -> Right (NoAction, ClientWaitingWithBuffer w b')
 
 applyServer :: (OTComposableOperation op)
-            => ClientState op -> Bool -> op -> (ClientAction op, ClientState op)
-applyServer ClientSynchronized False op = (ApplyOperation op, ClientSynchronized)
-applyServer ClientSynchronized True _ = error $ "got an operation from server that's supposedly an operation from this client" ++
-                                                "altough according to the state the client isn't waiting for an outstanding operation"
+            => ClientState op -> Bool -> op -> Either String (ClientAction op, ClientState op)
+applyServer ClientSynchronized False op = Right (ApplyOperation op, ClientSynchronized)
+applyServer ClientSynchronized True _ = Left $ "got an operation from server that's supposedly an operation from this client" ++
+                                               "altough according to the state the client isn't waiting for an outstanding operation"
 applyServer (ClientWaiting w) False op = case transform w op of
-  Left err -> error $ "transform failed: " ++ err
-  Right (w', op') -> (ApplyOperation op', ClientWaiting w')
-applyServer (ClientWaiting _) True _ = (NoAction, ClientSynchronized)
+  Left err -> Left $ "transform failed: " ++ err
+  Right (w', op') -> Right (ApplyOperation op', ClientWaiting w')
+applyServer (ClientWaiting _) True _ = Right (NoAction, ClientSynchronized)
 applyServer (ClientWaitingWithBuffer w b) False op = case transform w op of
-  Left err -> error $ "transform failed: " ++ err
+  Left err -> Left $ "transform failed: " ++ err
   Right (w', op') -> case transform b op' of
-    Left err -> error $ "transform failed: " ++ err
-    Right (b', op'') -> (ApplyOperation op'', ClientWaitingWithBuffer w' b')
-applyServer (ClientWaitingWithBuffer _ b) True _ = (SendOperation b, ClientWaiting b)
+    Left err -> Left $ "transform failed: " ++ err
+    Right (b', op'') -> Right (ApplyOperation op'', ClientWaitingWithBuffer w' b')
+applyServer (ClientWaitingWithBuffer _ b) True _ = Right (SendOperation b, ClientWaiting b)

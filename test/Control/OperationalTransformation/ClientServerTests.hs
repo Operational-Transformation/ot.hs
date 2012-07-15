@@ -7,7 +7,6 @@ module Control.OperationalTransformation.ClientServerTests
 import Control.OperationalTransformation
 import Control.OperationalTransformation.Client
 import Control.OperationalTransformation.Server
-import Data.Maybe (fromJust)
 import Control.Monad (join)
 
 import Control.OperationalTransformation.Text.Tests (genOperation)
@@ -97,7 +96,7 @@ prop_client_server genOp = join $ do
           return (server, replace clientN client' clients)
         1 | canSend client -> do
           let (op, client') = sendClient client
-              (op', server') = receiveServer server op
+              Right (op', server') = receiveServer server op
               clients' = replace clientN client' clients
               clients'' = broadcast op' clients'
           return (server', clients'')
@@ -119,7 +118,7 @@ prop_client_server genOp = join $ do
     receiveClient client = case clientReceiveQueue client of
       [] -> error "empty receive queue"
       eo@(ExtendedOperation cid _ _):ops ->
-        let (action, state') = applyServer (clientState client) (cid == clientId client) eo
+        let Right (action, state') = applyServer (clientState client) (cid == clientId client) eo
             client' = client { clientReceiveQueue = ops
                              , clientState = state'
                              , clientRevision = clientRevision client + 1
@@ -139,7 +138,7 @@ prop_client_server genOp = join $ do
       op <- genOp $ clientDoc client
       let eop = ExtendedOperation (clientId client) (nextRevision client) op
           doc' = fromRight $ apply eop $ clientDoc client
-          (action, state') = applyClient (clientState client) eop
+          Right (action, state') = applyClient (clientState client) eop
           client' = client { clientState = state', clientDoc = doc' }
       return $ case action of
         ApplyOperation _ -> error "shouldn't happen"
