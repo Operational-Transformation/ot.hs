@@ -16,7 +16,7 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 import qualified Data.Text as T
 import Data.String (fromString)
-import Control.Monad (liftM, join)
+import Control.Monad (join, liftM, liftM2)
 
 instance Arbitrary T.Text where
   arbitrary = liftM fromString arbitrary
@@ -82,6 +82,16 @@ wellFormed (TextOperation ops) = all (not . nullLength) ops
         nullLength (Insert i) = i == ""
         nullLength (Delete d) = d == 0
 
+prop_invert :: T.Text -> Gen Bool
+prop_invert doc = do
+  op <- genOperation doc
+  return $ case liftM2 (,) (invertOperation op doc) (apply op doc) of
+    Left _ -> False
+    Right (invOp, doc') -> case apply invOp doc' of
+      Left _ -> False
+      Right doc2 -> doc2 == doc
+
+
 tests :: Test
 tests = testGroup "Control.OperationalTransformation.Text.Tests"
   [ testProperty "prop_compose_apply" $ prop_compose_apply genOperation
@@ -90,4 +100,5 @@ tests = testGroup "Control.OperationalTransformation.Text.Tests"
   , testProperty "prop_compose_length" prop_compose_length
   , testProperty "prop_compose_well_formed" prop_compose_well_formed
   , testProperty "prop_transform_well_formed" prop_transform_well_formed
+  , testProperty "prop_invert" prop_invert
   ]

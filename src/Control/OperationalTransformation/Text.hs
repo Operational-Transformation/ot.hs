@@ -3,6 +3,7 @@
 module Control.OperationalTransformation.Text
   ( Action (..)
   , TextOperation (..)
+  , invertOperation
   ) where
 
 import Control.OperationalTransformation
@@ -100,3 +101,14 @@ instance OTSystem T.Text TextOperation where
           then Left "operation can't be applied to the document: operation is longer than the text"
           else loop ops (T.drop d it) ot
       loop _ _ _ = Left "operation can't be applied to the document: text is longer than the operation"
+
+invertOperation :: TextOperation -> T.Text -> Either String TextOperation
+invertOperation (TextOperation actions) doc = loop actions doc []
+  where
+    loop (op:ops) text inv = case op of
+      (Retain n) -> loop ops (T.drop n text) (Retain n : inv)
+      (Insert i) -> loop ops text (Delete (T.length i) : inv)
+      (Delete d) -> let (before, after) = T.splitAt d text
+                    in loop ops after (Insert before : inv)
+    loop [] "" inv = Right . TextOperation . reverse $ inv
+    loop [] _ _ = Left "invert failed: text is longer than the operation"
