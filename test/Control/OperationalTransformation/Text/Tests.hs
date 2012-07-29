@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Control.OperationalTransformation.Text.Tests
@@ -17,9 +18,13 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 import qualified Data.Text as T
 import Data.String (fromString)
 import Control.Monad (join, liftM, liftM2)
+import Data.Aeson.Types
 
 instance Arbitrary T.Text where
   arbitrary = liftM fromString arbitrary
+
+instance Arbitrary TextOperation where
+  arbitrary = arbitrary >>= genOperation
 
 genOperation :: T.Text -> Gen TextOperation
 genOperation = liftM TextOperation . gen
@@ -40,6 +45,9 @@ deltaLength (TextOperation ops) = sum (map len ops)
   where len (Retain _)   = 0
         len (Insert i) = T.length i
         len (Delete d) = -d
+
+prop_json_id :: TextOperation -> Bool
+prop_json_id o = parseMaybe parseJSON (toJSON o) == Just o
 
 prop_apply_length :: T.Text -> Property
 prop_apply_length doc = join $ do
@@ -94,7 +102,8 @@ prop_invert doc = do
 
 tests :: Test
 tests = testGroup "Control.OperationalTransformation.Text.Tests"
-  [ testProperty "prop_compose_apply" $ prop_compose_apply genOperation
+  [ testProperty "prop_json_id" prop_json_id
+  , testProperty "prop_compose_apply" $ prop_compose_apply genOperation
   , testProperty "prop_transform_apply" $ prop_transform_apply genOperation
   , testProperty "prop_apply_length" prop_apply_length
   , testProperty "prop_compose_length" prop_compose_length

@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
 
 module Control.OperationalTransformation.Text
   ( Action (..)
@@ -8,14 +8,30 @@ module Control.OperationalTransformation.Text
 
 import Control.OperationalTransformation
 import qualified Data.Text as T
-import Data.Monoid (mappend)
+import Data.Monoid (mappend, mconcat, First (..))
+import Data.Aeson
 
 data Action = Retain !Int
             | Insert !T.Text
             | Delete !Int
             deriving (Eq, Read, Show)
 
-newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show)
+instance ToJSON Action where
+  toJSON (Retain n) = object [ "retain" .= n ]
+  toJSON (Insert t) = object [ "insert" .= t ]
+  toJSON (Delete n) = object [ "delete" .= n ]
+
+instance FromJSON Action where
+  parseJSON (Object o) = do
+    retain <- fmap (fmap Retain) $ o .:? "retain"
+    insert <- fmap (fmap Insert) $ o .:? "insert"
+    delete <- fmap (fmap Delete) $ o .:? "delete"
+    case getFirst . mconcat . map First $ [retain, insert, delete] of
+      Just action -> return action
+      Nothing -> fail "not a valid action"
+  parseJSON _ = fail "expected an object"
+
+newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show, FromJSON, ToJSON)
 
 addRetain :: Int -> [Action] -> [Action]
 addRetain n (Retain m : xs) = Retain (n+m) : xs
