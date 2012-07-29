@@ -1,5 +1,5 @@
 language: haskell
 before_script:
-  - "cabal install QuickCheck test-framework test-framework-quickcheck2"
+  - "cabal install QuickCheck test-framework test-framework-quickcheck2-0.2.12.2"
 after_script:
   - "cat dist/test/operational-transformation-*-tests.log"
