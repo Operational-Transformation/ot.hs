@@ -8,8 +8,9 @@ module Control.OperationalTransformation.Text
 
 import Control.OperationalTransformation
 import qualified Data.Text as T
-import Data.Monoid (mappend, mconcat, First (..))
-import Data.Aeson
+import Data.Monoid (mappend)
+import Data.Aeson (Value (..), FromJSON (..), ToJSON (..))
+import Data.Attoparsec.Number (Number (..))
 
 data Action = Retain !Int
             | Insert !T.Text
@@ -17,19 +18,15 @@ data Action = Retain !Int
             deriving (Eq, Read, Show)
 
 instance ToJSON Action where
-  toJSON (Retain n) = object [ "retain" .= n ]
-  toJSON (Insert t) = object [ "insert" .= t ]
-  toJSON (Delete n) = object [ "delete" .= n ]
+  toJSON (Retain n) = Number $ I (toInteger n)
+  toJSON (Insert t) = String t
+  toJSON (Delete n) = Number $ I (toInteger (-n))
 
 instance FromJSON Action where
-  parseJSON (Object o) = do
-    retain <- fmap (fmap Retain) $ o .:? "retain"
-    insert <- fmap (fmap Insert) $ o .:? "insert"
-    delete <- fmap (fmap Delete) $ o .:? "delete"
-    case getFirst . mconcat . map First $ [retain, insert, delete] of
-      Just action -> return action
-      Nothing -> fail "not a valid action"
-  parseJSON _ = fail "expected an object"
+  parseJSON (Number (I n)) | n > 0 = return $ Retain (fromInteger n)
+                           | n < 0 = return $ Delete (fromInteger (-n))
+  parseJSON (String i) = return $ Insert i
+  parseJSON _ = fail "expected a non-zero integer or a string"
 
 newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show, FromJSON, ToJSON)
 
