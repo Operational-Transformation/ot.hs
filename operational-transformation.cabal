@@ -20,7 +20,7 @@ Build-type:          Simple
 -- Extra-source-files:  
 
 -- Constraint on the version of Cabal needed to build this package.
-Cabal-version:       >=1.2
+Cabal-version:         >= 1.8
 
 
 Library
@@ -38,13 +38,13 @@ Library
 
 Test-suite tests
   Ghc-options:         -Wall -rtsopts
-  Hs-source-dirs:      src test
+  Hs-source-dirs:      test
   type:                exitcode-stdio-1.0
   main-is:             TestSuite.hs
-  Build-depends:       QuickCheck >= 2.4.2 && < 2.5,
-                       -- Copy pasted from library dependencies
-                       base >= 4 && < 5,
-                       text >= 0.11.1 && < 0.12,
-                       QuickCheck >= 2.4.2 && < 2.5,
+  Build-depends:       operational-transformation,
+                       QuickCheck,
+                       base,
+                       text,
+                       aeson,
                        test-framework >= 0.6 && < 0.7,
                        test-framework-quickcheck2 >= 0.2.12.2 && < 0.3
