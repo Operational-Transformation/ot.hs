@@ -8,6 +8,7 @@ import Control.OperationalTransformation
 import Control.OperationalTransformation.Client
 import Control.OperationalTransformation.Server
 import Control.Monad (join)
+import Data.Maybe (fromJust)
 
 import Control.OperationalTransformation.Text.Tests (genOperation)
 
@@ -26,36 +27,13 @@ appendQueue a q = q ++ [a]
 
 type ClientId = Int
 
-data ExtendedOperation op = ExtendedOperation !ClientId !Revision !op
-
-instance (OTOperation op) => OTOperation (ExtendedOperation op) where
-  transform (ExtendedOperation cida reva opa) (ExtendedOperation cidb revb opb)
-    | cida == cidb = Left "operations can't be transformed since they originate from the same client"
-    | otherwise    = case transform opa opb of
-        Left err -> Left err
-        Right (a', b') -> Right (ExtendedOperation cida (reva+1) a', ExtendedOperation cidb (revb+1) b')
-
-instance (OTComposableOperation op) => OTComposableOperation (ExtendedOperation op) where
-  compose (ExtendedOperation cid rev a) (ExtendedOperation _ _ b) = case compose a b of
-    Left err -> Left err
-    Right ab -> Right $ ExtendedOperation cid rev ab
-
-instance (OTSystem doc op) => OTSystem doc (ExtendedOperation op) where
-  apply (ExtendedOperation _ _ op) doc = apply op doc
-
 data ExtendedClient doc op = ExtendedClient { clientId :: !ClientId
                                             , clientRevision :: !Revision
-                                            , clientSendQueue :: Queue op
-                                            , clientReceiveQueue :: Queue op
+                                            , clientSendQueue :: Queue (Revision, op)
+                                            , clientReceiveQueue :: Queue (Maybe op)
                                             , clientDoc :: !doc
                                             , clientState :: !(ClientState op)
                                             } deriving (Show)
-
-nextRevision :: ExtendedClient doc op -> Revision
-nextRevision client = clientRevision client + case clientState client of
-  ClientSynchronized -> 0
-  ClientWaiting _ -> 1
-  ClientWaitingWithBuffer _ _ -> 2
 
 prop_client_server :: (Eq doc, Arbitrary doc, OTSystem doc op, OTComposableOperation op)
                    => (doc -> Gen op) -> Property
@@ -95,10 +73,10 @@ prop_client_server genOp = join $ do
           let client' = receiveClient client
           return (server, replace clientN client' clients)
         1 | canSend client -> do
-          let (op, client') = sendClient client
-              Right (op', server') = receiveServer server op
+          let ((rev, op), client') = sendClient client
+              Right (op', server') = applyOperation server rev op
               clients' = replace clientN client' clients
-              clients'' = broadcast op' clients'
+              clients'' = broadcast (clientId client) op' clients'
           return (server', clients'')
         _ | n < 0 -> return (server, clients)
           | otherwise -> do
@@ -117,18 +95,21 @@ prop_client_server genOp = join $ do
 
     receiveClient client = case clientReceiveQueue client of
       [] -> error "empty receive queue"
-      eo@(ExtendedOperation cid _ _):ops ->
-        let Right (action, state') = applyServer (clientState client) (cid == clientId client) eo
-            client' = client { clientReceiveQueue = ops
-                             , clientState = state'
-                             , clientRevision = clientRevision client + 1
-                             }
+      msg:ops ->
+        let
+          (action, state') = case msg of
+            Nothing -> fromJust $ serverAck (clientState client)
+            Just op -> let Right r = applyServer (clientState client) op in r
+          client' = client { clientReceiveQueue = ops
+                           , clientState = state'
+                           , clientRevision = clientRevision client + 1
+                           }
         in case action of
           NoAction -> client'
           ApplyOperation op -> case apply op (clientDoc client') of
             Left err -> error $ "apply failed: " ++ err
             Right doc' -> client' { clientDoc = doc' }
-          SendOperation op -> client' { clientSendQueue = appendQueue op (clientSendQueue client') }
+          SendOperation op -> client' { clientSendQueue = appendQueue (clientRevision client', op) (clientSendQueue client') }
 
     sendClient client = case clientSendQueue client of
       [] -> error "empty send queue"
@@ -136,21 +117,22 @@ prop_client_server genOp = join $ do
 
     editClient client = do
       op <- genOp $ clientDoc client
-      let eop = ExtendedOperation (clientId client) (nextRevision client) op
-          doc' = fromRight $ apply eop $ clientDoc client
-          Right (action, state') = applyClient (clientState client) eop
+      let doc' = fromRight $ apply op $ clientDoc client
+          Right (action, state') = applyClient (clientState client) op
           client' = client { clientState = state', clientDoc = doc' }
       return $ case action of
         ApplyOperation _ -> error "shouldn't happen"
         NoAction -> client'
-        SendOperation eop' -> client' { clientSendQueue = appendQueue eop' (clientSendQueue client) }
+        SendOperation op' -> client'
+          { clientSendQueue = appendQueue (clientRevision client, op') (clientSendQueue client)
+          }
 
     fromRight (Right a) = a
     fromRight (Left err) = error err
 
-    receiveServer server eo@(ExtendedOperation _ rev _) = applyOperation server rev eo
-
-    broadcast op = map $ \client -> client { clientReceiveQueue = appendQueue op (clientReceiveQueue client) }
+    broadcast creator op = map $ \client ->
+      let msg = if creator == clientId client then Nothing else Just op
+      in client { clientReceiveQueue = appendQueue msg (clientReceiveQueue client) }
 
     isSynchronized client = case clientState client of
       ClientSynchronized -> True

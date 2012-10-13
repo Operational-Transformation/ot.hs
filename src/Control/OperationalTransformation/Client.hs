@@ -4,6 +4,7 @@ module Control.OperationalTransformation.Client
   , initialClientState
   , applyClient
   , applyServer
+  , serverAck
   ) where
 
 import Control.OperationalTransformation
@@ -30,17 +31,18 @@ applyClient (ClientWaitingWithBuffer w b) op = case compose b op of
   Right b' -> Right (NoAction, ClientWaitingWithBuffer w b')
 
 applyServer :: (OTComposableOperation op)
-            => ClientState op -> Bool -> op -> Either String (ClientAction op, ClientState op)
-applyServer ClientSynchronized False op = Right (ApplyOperation op, ClientSynchronized)
-applyServer ClientSynchronized True _ = Left $ "got an operation from server that's supposedly an operation from this client" ++
-                                               "altough according to the state the client isn't waiting for an outstanding operation"
-applyServer (ClientWaiting w) False op = case transform w op of
+            => ClientState op -> op -> Either String (ClientAction op, ClientState op)
+applyServer ClientSynchronized op = Right (ApplyOperation op, ClientSynchronized)
+applyServer (ClientWaiting w) op = case transform w op of
   Left err -> Left $ "transform failed: " ++ err
   Right (w', op') -> Right (ApplyOperation op', ClientWaiting w')
-applyServer (ClientWaiting _) True _ = Right (NoAction, ClientSynchronized)
-applyServer (ClientWaitingWithBuffer w b) False op = case transform w op of
+applyServer (ClientWaitingWithBuffer w b) op = case transform w op of
   Left err -> Left $ "transform failed: " ++ err
   Right (w', op') -> case transform b op' of
     Left err -> Left $ "transform failed: " ++ err
     Right (b', op'') -> Right (ApplyOperation op'', ClientWaitingWithBuffer w' b')
-applyServer (ClientWaitingWithBuffer _ b) True _ = Right (SendOperation b, ClientWaiting b)
+
+serverAck :: ClientState op -> Maybe (ClientAction op, ClientState op)
+serverAck ClientSynchronized            = Nothing
+serverAck (ClientWaiting _)             = Just (NoAction, ClientSynchronized)
+serverAck (ClientWaitingWithBuffer _ b) = Just (SendOperation b, ClientWaiting b)
