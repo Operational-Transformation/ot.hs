@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
 
 module Control.OperationalTransformation.Text
   ( Action (..)
@@ -11,11 +11,12 @@ import qualified Data.Text as T
 import Data.Monoid (mappend)
 import Data.Aeson (Value (..), FromJSON (..), ToJSON (..))
 import Data.Attoparsec.Number (Number (..))
+import Data.Typeable (Typeable)
 
 data Action = Retain !Int
             | Insert !T.Text
             | Delete !Int
-            deriving (Eq, Read, Show)
+            deriving (Eq, Read, Show, Typeable)
 
 instance ToJSON Action where
   toJSON (Retain n) = Number $ I (toInteger n)
@@ -28,7 +29,7 @@ instance FromJSON Action where
   parseJSON (String i) = return $ Insert i
   parseJSON _ = fail "expected a non-zero integer or a string"
 
-newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show, FromJSON, ToJSON)
+newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show, Typeable, FromJSON, ToJSON)
 
 addRetain :: Int -> [Action] -> [Action]
 addRetain n (Retain m : xs) = Retain (n+m) : xs
