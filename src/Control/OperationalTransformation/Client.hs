@@ -1,6 +1,5 @@
 module Control.OperationalTransformation.Client
   ( ClientState (..)
-  , ClientAction (..)
   , initialClientState
   , applyClient
   , applyServer
@@ -14,35 +13,34 @@ data ClientState op = ClientSynchronized
                     | ClientWaitingWithBuffer op op
                     deriving (Eq, Show, Read)
 
-data ClientAction op = NoAction
-                     | ApplyOperation op
-                     | SendOperation op
-                     deriving (Eq, Show, Read)
-
 initialClientState :: ClientState op
 initialClientState = ClientSynchronized
 
 applyClient :: (OTComposableOperation op)
-            => ClientState op -> op -> Either String (ClientAction op, ClientState op)
-applyClient ClientSynchronized op = Right (SendOperation op, ClientWaiting op)
-applyClient (ClientWaiting w) op = Right (NoAction, ClientWaitingWithBuffer w op)
+            => ClientState op
+            -> op
+            -> Either String (Bool, ClientState op)
+applyClient ClientSynchronized op = Right (True, ClientWaiting op)
+applyClient (ClientWaiting w) op = Right (False, ClientWaitingWithBuffer w op)
 applyClient (ClientWaitingWithBuffer w b) op = case compose b op of
   Left err -> Left $ "operations couldn't be composed: " ++ err
-  Right b' -> Right (NoAction, ClientWaitingWithBuffer w b')
+  Right b' -> Right (False, ClientWaitingWithBuffer w b')
 
 applyServer :: (OTComposableOperation op)
-            => ClientState op -> op -> Either String (ClientAction op, ClientState op)
-applyServer ClientSynchronized op = Right (ApplyOperation op, ClientSynchronized)
+            => ClientState op
+            -> op
+            -> Either String (op, ClientState op)
+applyServer ClientSynchronized op = Right (op, ClientSynchronized)
 applyServer (ClientWaiting w) op = case transform w op of
   Left err -> Left $ "transform failed: " ++ err
-  Right (w', op') -> Right (ApplyOperation op', ClientWaiting w')
+  Right (w', op') -> Right (op', ClientWaiting w')
 applyServer (ClientWaitingWithBuffer w b) op = case transform w op of
   Left err -> Left $ "transform failed: " ++ err
   Right (w', op') -> case transform b op' of
     Left err -> Left $ "transform failed: " ++ err
-    Right (b', op'') -> Right (ApplyOperation op'', ClientWaitingWithBuffer w' b')
+    Right (b', op'') -> Right (op'', ClientWaitingWithBuffer w' b')
 
-serverAck :: ClientState op -> Maybe (ClientAction op, ClientState op)
+serverAck :: ClientState op -> Maybe (Maybe op, ClientState op)
 serverAck ClientSynchronized            = Nothing
-serverAck (ClientWaiting _)             = Just (NoAction, ClientSynchronized)
-serverAck (ClientWaitingWithBuffer _ b) = Just (SendOperation b, ClientWaiting b)
+serverAck (ClientWaiting _)             = Just (Nothing, ClientSynchronized)
+serverAck (ClientWaitingWithBuffer _ b) = Just (Just b, ClientWaiting b)

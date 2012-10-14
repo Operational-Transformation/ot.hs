@@ -97,19 +97,21 @@ prop_client_server genOp = join $ do
       [] -> error "empty receive queue"
       msg:ops ->
         let
-          (action, state') = case msg of
-            Nothing -> fromJust $ serverAck (clientState client)
-            Just op -> let Right r = applyServer (clientState client) op in r
           client' = client { clientReceiveQueue = ops
-                           , clientState = state'
                            , clientRevision = clientRevision client + 1
                            }
-        in case action of
-          NoAction -> client'
-          ApplyOperation op -> case apply op (clientDoc client') of
-            Left err -> error $ "apply failed: " ++ err
-            Right doc' -> client' { clientDoc = doc' }
-          SendOperation op -> client' { clientSendQueue = appendQueue (clientRevision client', op) (clientSendQueue client') }
+        in case msg of
+          Nothing -> case fromJust $ serverAck (clientState client') of
+            (Just op, clientState') -> client'
+              { clientState = clientState'
+              , clientSendQueue = appendQueue (clientRevision client', op) (clientSendQueue client')
+              }
+            (Nothing, clientState') -> client' { clientState = clientState' }
+          Just op -> case applyServer (clientState client) op of
+            Left err -> error $ "should not happen: " ++ err
+            Right (op', clientState') -> case apply op' (clientDoc client') of
+              Left err ->  error $ "apply failed: " ++ err
+              Right doc' -> client' { clientState = clientState', clientDoc = doc' }
 
     sendClient client = case clientSendQueue client of
       [] -> error "empty send queue"
@@ -118,14 +120,11 @@ prop_client_server genOp = join $ do
     editClient client = do
       op <- genOp $ clientDoc client
       let doc' = fromRight $ apply op $ clientDoc client
-          Right (action, state') = applyClient (clientState client) op
+          (shouldSend, state') = fromRight $ applyClient (clientState client) op
           client' = client { clientState = state', clientDoc = doc' }
-      return $ case action of
-        ApplyOperation _ -> error "shouldn't happen"
-        NoAction -> client'
-        SendOperation op' -> client'
-          { clientSendQueue = appendQueue (clientRevision client, op') (clientSendQueue client)
-          }
+      return $ if shouldSend
+        then client' { clientSendQueue = appendQueue (clientRevision client', op) (clientSendQueue client) }
+        else client'
 
     fromRight (Right a) = a
     fromRight (Left err) = error err
