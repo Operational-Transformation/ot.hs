@@ -17,6 +17,7 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 import qualified Data.Text as T
 import Data.String (fromString)
+import Data.Binary (encode, decode)
 import Control.Monad (join, liftM, liftM2)
 import Data.Aeson.Types
 
@@ -48,6 +49,9 @@ deltaLength (TextOperation ops) = sum (map len ops)
 
 prop_json_id :: TextOperation -> Bool
 prop_json_id o = parseMaybe parseJSON (toJSON o) == Just o
+
+prop_binary_id :: TextOperation -> Bool
+prop_binary_id o = decode (encode o) == o
 
 prop_apply_length :: T.Text -> Property
 prop_apply_length doc = join $ do
@@ -103,6 +107,7 @@ prop_invert doc = do
 tests :: Test
 tests = testGroup "Control.OperationalTransformation.Text.Tests"
   [ testProperty "prop_json_id" prop_json_id
+  , testProperty "prop_binary_id" prop_binary_id
   , testProperty "prop_compose_apply" $ prop_compose_apply genOperation
   , testProperty "prop_transform_apply" $ prop_transform_apply genOperation
   , testProperty "prop_apply_length" prop_apply_length

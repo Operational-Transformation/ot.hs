@@ -10,13 +10,27 @@ import Control.OperationalTransformation
 import qualified Data.Text as T
 import Data.Monoid (mappend)
 import Data.Aeson (Value (..), FromJSON (..), ToJSON (..))
+import Data.Binary (Binary (..), putWord8, getWord8)
 import Data.Attoparsec.Number (Number (..))
 import Data.Typeable (Typeable)
+import Data.Text (pack, unpack)
+import Control.Applicative ((<$>))
 
 data Action = Retain !Int
             | Insert !T.Text
             | Delete !Int
             deriving (Eq, Read, Show, Typeable)
+
+instance Binary Action where
+  put (Retain n) = putWord8 0 >> put n
+  put (Insert i) = putWord8 1 >> put (unpack i)
+  put (Delete n) = putWord8 2 >> put n
+  get = do
+    t <- getWord8
+    case t of
+      0 -> Retain <$> get
+      1 -> Insert . pack <$> get
+      _ -> Delete <$> get
 
 instance ToJSON Action where
   toJSON (Retain n) = Number $ I (toInteger n)
@@ -29,7 +43,7 @@ instance FromJSON Action where
   parseJSON (String i) = return $ Insert i
   parseJSON _ = fail "expected a non-zero integer or a string"
 
-newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show, Typeable, FromJSON, ToJSON)
+newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show, Binary, Typeable, FromJSON, ToJSON)
 
 addRetain :: Int -> [Action] -> [Action]
 addRetain n (Retain m : xs) = Retain (n+m) : xs
