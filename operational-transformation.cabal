@@ -1,9 +1,9 @@
-Name:                operational-transformation
-Version:             0.1
+Name:                ot
+Version:             0.1.1
 Synopsis:            Real-time collaborative editing with Operational transformation
 -- A longer description of the package.
 -- Description:         
-Homepage:            https://github.com/timjb/haskell-operational-transformation
+Homepage:            https://github.com/timjb/ot.hs
 License:             MIT
 License-file:        LICENSE
 Author:              Tim Baumann
@@ -42,7 +42,7 @@ Test-suite tests
   Hs-source-dirs:      test
   type:                exitcode-stdio-1.0
   main-is:             TestSuite.hs
-  Build-depends:       operational-transformation,
+  Build-depends:       ot,
                        QuickCheck,
                        base,
                        text,
