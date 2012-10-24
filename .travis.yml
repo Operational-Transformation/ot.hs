@@ -1,3 +1,3 @@
 language: haskell
 after_script:
-  - "cat dist/test/operational-transformation-*-tests.log"
+  - "cat dist/test/ot-*-tests.log"
