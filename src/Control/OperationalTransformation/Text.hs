@@ -16,9 +16,11 @@ import Data.Typeable (Typeable)
 import Data.Text (pack, unpack)
 import Control.Applicative ((<$>))
 
-data Action = Retain !Int
-            | Insert !T.Text
-            | Delete !Int
+
+-- | An action changes the text at the current position or advances the cursor.
+data Action = Retain !Int    -- ^ Skip the next n characters.
+            | Insert !T.Text -- ^ Insert the given text at the current position.
+            | Delete !Int    -- ^ Delete the next n characters.
             deriving (Eq, Read, Show, Typeable)
 
 instance Binary Action where
@@ -43,6 +45,10 @@ instance FromJSON Action where
   parseJSON (String i) = return $ Insert i
   parseJSON _ = fail "expected a non-zero integer or a string"
 
+-- | An edit on plain text documents. An operation consists of multiple actions
+-- that change the document at the current cursor position or advance the
+-- cursor. After applying all actions, the cursor must be at the end of the
+-- document.
 newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show, Binary, Typeable, FromJSON, ToJSON)
 
 addRetain :: Int -> [Action] -> [Action]
@@ -130,7 +136,10 @@ instance OTSystem T.Text TextOperation where
           else loop ops (T.drop d it) ot
       loop _ _ _ = Left "operation can't be applied to the document: text is longer than the operation"
 
-invertOperation :: TextOperation -> T.Text -> Either String TextOperation
+-- | Computes the inverse of an operation. Useful for implementing undo.
+invertOperation :: TextOperation               -- ^ An operation.
+                -> T.Text                      -- ^ Document before the operation was applied.
+                -> Either String TextOperation
 invertOperation (TextOperation actions) doc = loop actions doc []
   where
     loop (op:ops) text inv = case op of

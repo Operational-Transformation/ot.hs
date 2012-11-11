@@ -10,12 +10,18 @@ import Control.Monad (foldM)
 import Control.Monad.Instances ()
 
 class OTOperation op where
+  -- | Transforms two concurrent operations /a/ and /b/, producing /a'/ and /b'/ 
+  -- such that @b' ∘ a == a' ∘ b@.
   transform :: op -> op -> Either String (op, op)
 
 class (OTOperation op) => OTComposableOperation op where
+  -- | Composes two operations /a/ and /b/, producing /c/, such that /c/ has the
+  -- same effect when applied to a document as applying /a/ and /b/ one after
+  -- another.
   compose :: op -> op -> Either String op
 
 class (OTOperation op) => OTSystem doc op where
+  -- | Apply an operation to a document, producing a new document.
   apply :: op -> doc -> Either String doc
 
 instance (OTOperation op) => OTOperation [op] where

@@ -16,6 +16,8 @@ eitherProperty :: (Either String a) -> (a -> Property) -> Property
 eitherProperty (Left err) _ = property $ failed { reason = err }
 eitherProperty (Right res) prop = prop res
 
+-- | @(b ∘ a)(d) = a(b(d))@ where /a/ and /b/ are two consecutive operations
+-- and /d/ is the initial document.
 prop_compose_apply :: (OTSystem doc op, OTComposableOperation op, Arbitrary doc, Show doc, Eq doc)
                    => (doc -> Gen op) -> Property
 prop_compose_apply genOperation = do
@@ -27,8 +29,11 @@ prop_compose_apply genOperation = do
       eitherProperty (compose a b) $ \ab -> do
         property $ Right doc'' ==? apply ab doc
 
+-- | @b'(a(d)) = b'(a(d))@ where /a/ and /b/ are random operations, /d/ is the
+-- initial document and @(a', b') = transform(a, b)@.
 prop_transform_apply :: (OTSystem doc op, Arbitrary doc, Show doc, Eq doc)
-                     => (doc -> Gen op) -> Property
+                     => (doc -> Gen op)
+                     -> Property
 prop_transform_apply genOperation = do
   doc <- arbitrary
   a <- genOperation doc
