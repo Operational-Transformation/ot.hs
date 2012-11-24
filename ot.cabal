@@ -3,7 +3,7 @@ Version:             0.1.1.1
 Synopsis:            Real-time collaborative editing with Operational Transformation
 -- A longer description of the package.
 -- Description:         
-Homepage:            https://github.com/timjb/ot.hs
+Homepage:            https://github.com/operational-transformation/ot.hs
 License:             MIT
 License-file:        LICENSE
 Author:              Tim Baumann
