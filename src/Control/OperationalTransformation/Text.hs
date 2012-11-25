@@ -1,20 +1,26 @@
-{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, GeneralizedNewtypeDeriving, DeriveDataTypeable, FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
 
 module Control.OperationalTransformation.Text
-  ( Action (..)
+  (
+    -- * Simple text operations
+    Action (..)
   , TextOperation (..)
   , invertOperation
+    -- * Text operations augmented with cursor information
+  , Cursor (..)
+  , updateCursor
+  , AugmentedTextOperation (..)
   ) where
 
 import Control.OperationalTransformation
 import qualified Data.Text as T
 import Data.Monoid (mappend)
-import Data.Aeson (Value (..), FromJSON (..), ToJSON (..))
+import Data.Aeson (Value (..), FromJSON (..), ToJSON (..), (.=), object, (.:))
 import Data.Binary (Binary (..), putWord8, getWord8)
 import Data.Attoparsec.Number (Number (..))
 import Data.Typeable (Typeable)
 import Data.Text (pack, unpack)
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>))
 
 
 -- | An action changes the text at the current position or advances the cursor.
@@ -149,3 +155,57 @@ invertOperation (TextOperation actions) doc = loop actions doc []
                     in loop ops after (Insert before : inv)
     loop [] "" inv = Right . TextOperation . reverse $ inv
     loop [] _ _ = Left "invert failed: text is longer than the operation"
+
+-- | A cursor has a 'cursorPosition' and a 'cursorSelectionEnd'. Both are
+-- zero-based indexes into the document. When nothing is selected,
+-- 'cursorSelectionEnd' is equal to 'cursorPosition'. When there is a selection,
+-- 'cursorPosition' is always the side of the selection that would move if you
+-- pressed an arrow key.
+data Cursor = Cursor { cursorPosition, cursorSelectionEnd :: Int } deriving (Eq, Show, Read)
+
+-- | Update cursor with respect to an operation.
+updateCursor :: Cursor -> TextOperation -> Cursor
+updateCursor (Cursor p s) (TextOperation actions) = Cursor transformedP transformedS
+  where
+    transformedP = transformComponent p
+    transformedS = if p == s then transformedP else transformComponent s
+    transformComponent c = loop c c actions
+    loop oldIndex newIndex _ | oldIndex < 0 = newIndex
+    loop _ newIndex [] = newIndex
+    loop oldIndex newIndex (op:ops) = case op of
+      Retain r -> loop (oldIndex-r) newIndex ops
+      Insert i -> loop oldIndex (newIndex + T.length i) ops
+      Delete d -> loop (oldIndex-d) (newIndex - min oldIndex d) ops
+
+instance ToJSON Cursor where
+  toJSON (Cursor p s) = object [ "position" .= p, "selectionEnd" .= s ]
+
+instance FromJSON Cursor where
+  parseJSON (Object o) = Cursor <$> o .: "position" <*> o .: "selectionEnd"
+  parseJSON _ = fail "expected an object"
+
+-- | An operation bundled with the cursor position after the operation.
+data AugmentedTextOperation = AugmentedTextOperation
+  { augmentedCursor    :: Cursor
+  , augmentedOperation :: TextOperation
+  } deriving (Eq, Show, Read)
+
+instance ToJSON AugmentedTextOperation where
+  toJSON (AugmentedTextOperation cursor textOp) = object [ "meta" .= cursor, "operation" .= textOp ]
+
+instance FromJSON AugmentedTextOperation where
+  parseJSON (Object o) = AugmentedTextOperation <$> o .: "meta" <*> o .: "operation"
+  parseJSON _ = fail "expected an object"
+
+instance OTOperation AugmentedTextOperation where
+  transform (AugmentedTextOperation cursorA opA) (AugmentedTextOperation cursorB opB) = do
+    (opA', opB') <- transform opA opB
+    return ( AugmentedTextOperation (updateCursor cursorA opB') opA'
+           , AugmentedTextOperation (updateCursor cursorB opA') opB'
+           )
+
+instance OTComposableOperation AugmentedTextOperation where
+  compose (AugmentedTextOperation _ a) (AugmentedTextOperation cursor b) = AugmentedTextOperation cursor <$> compose a b
+
+instance (OTSystem doc TextOperation) => OTSystem doc AugmentedTextOperation where
+  apply (AugmentedTextOperation _ textOp) = apply textOp

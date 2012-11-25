@@ -44,9 +44,11 @@ Test-suite tests
   main-is:             TestSuite.hs
   Build-depends:       ot,
                        QuickCheck,
+                       HUnit,
                        base,
                        text,
                        aeson,
                        test-framework >= 0.6 && < 0.7,
                        test-framework-quickcheck2 >= 0.2.12.2 && < 0.3,
+                       test-framework-hunit >= 0.2.7 && < 0.3,
                        binary >= 0.5.1.0
