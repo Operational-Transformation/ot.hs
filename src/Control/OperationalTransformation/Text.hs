@@ -191,10 +191,10 @@ data AugmentedTextOperation = AugmentedTextOperation
   } deriving (Eq, Show, Read)
 
 instance ToJSON AugmentedTextOperation where
-  toJSON (AugmentedTextOperation cursor textOp) = object [ "meta" .= cursor, "operation" .= textOp ]
+  toJSON (AugmentedTextOperation cursor textOp) = object [ "cursor" .= cursor, "operation" .= textOp ]
 
 instance FromJSON AugmentedTextOperation where
-  parseJSON (Object o) = AugmentedTextOperation <$> o .: "meta" <*> o .: "operation"
+  parseJSON (Object o) = AugmentedTextOperation <$> o .: "cursor" <*> o .: "operation"
   parseJSON _ = fail "expected an object"
 
 instance OTOperation AugmentedTextOperation where
