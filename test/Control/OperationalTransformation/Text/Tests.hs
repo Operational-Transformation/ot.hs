@@ -131,8 +131,8 @@ testComposeAugmented :: Assertion
 testComposeAugmented = ab @=? ab'
   where
     a  = AugmentedTextOperation (Cursor 11 11) (TextOperation [Retain 5, Insert " Ipsum"])
-    b  = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Delete 1, Insert "L", Retain 10])
-    ab = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Delete 1, Insert "L", Retain 4, Insert " Ipsum"])
+    b  = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Insert "L", Delete 1, Retain 10])
+    ab = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Insert "L", Delete 1, Retain 4, Insert " Ipsum"])
     Right ab' = a `compose` b
 
 testApplyAugmented :: Assertion
@@ -145,6 +145,7 @@ tests = testGroup "Control.OperationalTransformation.Text.Tests"
   , testProperty "prop_binary_id" prop_binary_id
   , testProperty "prop_compose_apply" $ prop_compose_apply genOperation
   , testProperty "prop_transform_apply" $ prop_transform_apply genOperation
+  , testProperty "prop_transform_compose" $ prop_transform_compose genOperation
   , testProperty "prop_apply_length" prop_apply_length
   , testProperty "prop_compose_length" prop_compose_length
   , testProperty "prop_compose_well_formed" prop_compose_well_formed

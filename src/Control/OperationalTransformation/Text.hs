@@ -62,6 +62,7 @@ addRetain n (Retain m : xs) = Retain (n+m) : xs
 addRetain n xs = Retain n : xs
 
 addInsert :: T.Text -> [Action] -> [Action]
+addInsert s (Delete d : xs) = Delete d : addInsert s xs
 addInsert s (Insert t : xs) = Insert (t `mappend` s) : xs
 addInsert s xs = Insert s : xs
 

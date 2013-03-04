@@ -1,12 +1,13 @@
 module Control.OperationalTransformation.Properties
   ( prop_compose_apply
   , prop_transform_apply
+  , prop_transform_compose
   ) where
 
 import Control.OperationalTransformation
 import Test.QuickCheck hiding (Result, reason)
 import Test.QuickCheck.Property
-import Control.Monad (liftM2, liftM3)
+import Control.Applicative ((<$>), (<*>))
 
 (==?) :: (Eq a, Show a) => a -> a -> Result
 a ==? b | a == b    = succeeded
@@ -25,11 +26,10 @@ prop_compose_apply genOperation = do
   a <- genOperation doc
   eitherProperty (apply a doc) $ \doc' -> do
     b <- genOperation doc'
-    eitherProperty (apply b doc') $ \doc'' -> do
-      eitherProperty (compose a b) $ \ab -> do
-        property $ Right doc'' ==? apply ab doc
+    eitherProperty ((,) <$> apply b doc' <*> compose a b) $ \(doc'', ab) -> do
+      property $ Right doc'' ==? apply ab doc
 
--- | @b'(a(d)) = b'(a(d))@ where /a/ and /b/ are random operations, /d/ is the
+-- | @b'(a(d)) = a'(b(d))@ where /a/ and /b/ are random operations, /d/ is the
 -- initial document and @(a', b') = transform(a, b)@.
 prop_transform_apply :: (OTSystem doc op, Arbitrary doc, Show doc, Eq doc)
                      => (doc -> Gen op)
@@ -38,8 +38,23 @@ prop_transform_apply genOperation = do
   doc <- arbitrary
   a <- genOperation doc
   b <- genOperation doc
-  let res1 = liftM3 (,,) (apply a doc) (apply b doc) (transform a b)
+  let res1 = (,,) <$> apply a doc <*> apply b doc <*> transform a b
   eitherProperty res1 $ \(doca, docb, (a', b')) -> do
-    let res2 = liftM2 (,) (apply b' doca) (apply a' docb)
+    let res2 = (,) <$> apply b' doca <*> apply a' docb
     eitherProperty res2 $ \(docab', docba') ->
       property $ docab' ==? docba'
+
+-- | @b' ∘ a = a' ∘ b@ where /a/ and /b/ are random operations and
+-- @(a', b') = transform(a, b)@. Note that this is a stronger property than
+-- prop_transform_apply, because prop_transform_compose and
+-- prop_compose_apply imply prop_transform_apply.
+prop_transform_compose :: (OTSystem doc op, OTComposableOperation op, Arbitrary doc, Show op, Eq op)
+                      => (doc -> Gen op)
+                      -> Property
+prop_transform_compose genOperation = do
+  doc <- arbitrary
+  a <- genOperation doc
+  b <- genOperation doc
+  eitherProperty (transform a b) $ \(a', b') -> do
+    eitherProperty ((,) <$> compose a b' <*> compose b a') $ \(ab', ba') -> do
+      property $ ab' ==? ba'
