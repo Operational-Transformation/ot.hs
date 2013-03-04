@@ -55,7 +55,7 @@ instance FromJSON Action where
 -- that change the document at the current cursor position or advance the
 -- cursor. After applying all actions, the cursor must be at the end of the
 -- document.
-newtype TextOperation = TextOperation [Action] deriving (Eq, Read, Show, Binary, Typeable, FromJSON, ToJSON)
+newtype TextOperation = TextOperation [Action] deriving (Read, Show, Binary, Typeable, FromJSON, ToJSON)
 
 addRetain :: Int -> [Action] -> [Action]
 addRetain n (Retain m : xs) = Retain (n+m) : xs
@@ -69,6 +69,28 @@ addInsert s xs = Insert s : xs
 addDelete :: Int -> [Action] -> [Action]
 addDelete n (Delete m : xs) = Delete (n+m) : xs
 addDelete n xs = Delete n : xs
+
+-- | Merges actions, removes empty ops and makes insert ops come before delete
+-- ops. Propertys:
+--
+--     * Idempotence: @canonicalize op = canonicalize (canonicalize op)@
+--
+--     * Preserves the effect under apply: @apply op doc = apply (canonicalize op) doc@
+canonicalize :: TextOperation -> TextOperation
+canonicalize (TextOperation ops) = TextOperation $ reverse $ loop [] $ reverse ops
+  where
+    loop as [] = as
+    loop as (Retain n : bs) | n <= 0  = loop as bs
+                            | True    = loop (addRetain n as) bs
+    loop as (Insert i : bs) | i == "" = loop as bs
+                            | True    = loop (addInsert i as) bs
+    loop as (Delete d : bs) | d <= 0  = loop as bs
+                            | True    = loop (addDelete d as) bs
+
+instance Eq TextOperation where
+  a == b = opsa == opsb
+    where TextOperation opsa = canonicalize a
+          TextOperation opsb = canonicalize b
 
 instance OTOperation TextOperation where
   transform (TextOperation o1) (TextOperation o2) = both (TextOperation . reverse) `fmap` loop o1 o2 [] []

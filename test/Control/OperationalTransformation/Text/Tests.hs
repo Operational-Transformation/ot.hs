@@ -132,7 +132,7 @@ testComposeAugmented = ab @=? ab'
   where
     a  = AugmentedTextOperation (Cursor 11 11) (TextOperation [Retain 5, Insert " Ipsum"])
     b  = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Insert "L", Delete 1, Retain 10])
-    ab = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Insert "L", Delete 1, Retain 4, Insert " Ipsum"])
+    ab = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Delete 1, Insert "L", Retain 4, Insert " Ipsum"])
     Right ab' = a `compose` b
 
 testApplyAugmented :: Assertion
