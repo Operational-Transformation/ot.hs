@@ -146,6 +146,8 @@ tests = testGroup "Control.OperationalTransformation.Text.Tests"
   , testProperty "prop_compose_apply" $ prop_compose_apply genOperation
   , testProperty "prop_transform_apply" $ prop_transform_apply genOperation
   , testProperty "prop_transform_compose" $ prop_transform_compose genOperation
+  -- prop_transform_compose_compat_l and prop_transform_compose_compat_r
+  -- are /not/ supported.
   , testProperty "prop_apply_length" prop_apply_length
   , testProperty "prop_compose_length" prop_compose_length
   , testProperty "prop_compose_well_formed" prop_compose_well_formed
