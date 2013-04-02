@@ -26,7 +26,7 @@ Cabal-version:         >= 1.8
 Library
   Ghc-options:         -Wall
   Hs-source-dirs:      src
-  Exposed-modules:     Control.OperationalTransformation, Control.OperationalTransformation.Text, Control.OperationalTransformation.Properties, Control.OperationalTransformation.Client, Control.OperationalTransformation.Server
+  Exposed-modules:     Control.OperationalTransformation, Control.OperationalTransformation.List, Control.OperationalTransformation.Text, Control.OperationalTransformation.Properties, Control.OperationalTransformation.Client, Control.OperationalTransformation.Server
   Build-depends:       base >= 4 && < 5,
                        text >= 0.11.1 && < 0.12,
                        aeson >= 0.6.0.2 && < 0.7,
