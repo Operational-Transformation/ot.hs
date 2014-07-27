@@ -20,7 +20,7 @@ import Test.Framework.Providers.HUnit (testCase)
 import qualified Data.Text as T
 import Data.String (fromString)
 import Data.Binary (encode, decode)
-import Control.Monad (join, liftM, liftM2)
+import Control.Monad (liftM, liftM2)
 import Control.Applicative ((<$>), (<*>))
 import Data.Aeson.Types hiding (Result)
 
@@ -63,25 +63,25 @@ prop_binary_id :: TextOperation -> Bool
 prop_binary_id o = decode (encode o) == o
 
 prop_apply_length :: T.Text -> Property
-prop_apply_length doc = join $ do
+prop_apply_length doc = property $ do
   op <- genOperation doc
-  return . property $ case apply op doc of
+  return $ case apply op doc of
     Left _ -> False
     Right str' -> T.length str' == T.length doc + deltaLength op
 
 prop_compose_length :: T.Text -> Property
-prop_compose_length doc = join $ do
+prop_compose_length doc = property $ do
   a <- genOperation doc
-  case apply a doc of
-    Left _ -> return $ property rejected
-    Right doc' -> do
+  return $ case apply a doc of
+    Left _ -> property rejected
+    Right doc' -> property $ do
       b <- genOperation doc'
-      return . property $ case compose a b of
+      return $ case compose a b of
         Left _ -> False
         Right ab -> deltaLength a + deltaLength b == deltaLength ab
 
 prop_compose_well_formed :: T.Text -> Property
-prop_compose_well_formed doc = join $ fmap property $ do
+prop_compose_well_formed doc = property $ do
   a <- genOperation doc
   let Right doc' = apply a doc
   b <- genOperation doc'
@@ -90,7 +90,7 @@ prop_compose_well_formed doc = join $ fmap property $ do
     Right ab -> wellFormed ab
 
 prop_transform_well_formed :: T.Text -> Property
-prop_transform_well_formed doc = join $ fmap property $ do
+prop_transform_well_formed doc = property $ do
   a <- genOperation doc
   b <- genOperation doc
   return $ case transform a b of

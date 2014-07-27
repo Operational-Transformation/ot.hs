@@ -7,7 +7,6 @@ module Control.OperationalTransformation.ClientServerTests
 import Control.OperationalTransformation
 import Control.OperationalTransformation.Client
 import Control.OperationalTransformation.Server
-import Control.Monad (join)
 import Data.Maybe (fromJust)
 
 import Control.OperationalTransformation.Text.Tests (genOperation)
@@ -37,7 +36,7 @@ data ExtendedClient doc op = ExtendedClient { clientId :: !ClientId
 
 prop_client_server :: (Eq doc, Arbitrary doc, OTSystem doc op, OTComposableOperation op)
                    => (doc -> Gen op) -> Property
-prop_client_server genOp = join $ do
+prop_client_server genOp = property $ do
   doc <- arbitrary
   let server = initialServerState doc
       clients = createClients doc $ take numClients [1..]
