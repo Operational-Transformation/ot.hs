@@ -1,5 +1,5 @@
 Name:                ot
-Version:             0.1.2
+Version:             0.1.2.1
 Synopsis:            Real-time collaborative editing with Operational Transformation
 -- A longer description of the package.
 -- Description:         
@@ -9,15 +9,8 @@ License-file:        LICENSE
 Author:              Tim Baumann
 Maintainer:          tim@timbaumann.info
 
--- A copyright notice.
--- Copyright:           
-
 Category:            Text
 Build-type:          Simple
-
--- Extra files to be distributed with the package, such as examples or
--- a README.
--- Extra-source-files:  
 
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:         >= 1.8
