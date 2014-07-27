@@ -28,11 +28,11 @@ Library
   Hs-source-dirs:      src
   Exposed-modules:     Control.OperationalTransformation, Control.OperationalTransformation.List, Control.OperationalTransformation.Text, Control.OperationalTransformation.Properties, Control.OperationalTransformation.Client, Control.OperationalTransformation.Server
   Build-depends:       base >= 4 && < 5,
-                       text >= 0.11.1 && < 0.12,
-                       aeson >= 0.6.0.2 && < 0.7,
+                       text >= 1.0 && < 1.2,
+                       aeson >= 0.7 && < 0.9,
                        attoparsec >= 0.10.1.1 && < 1,
-                       QuickCheck >= 2.4.2 && < 2.6,
-                       binary >= 0.5.1.0
+                       QuickCheck >= 2.5 && < 2.8,
+                       binary >= 0.6.0.0 && < 0.8
 
   -- Modules not exported by this package.
   -- Other-modules:       
@@ -48,7 +48,7 @@ Test-suite tests
                        base,
                        text,
                        aeson,
-                       test-framework >= 0.6 && < 0.7,
-                       test-framework-quickcheck2 >= 0.2.12.2 && < 0.3,
-                       test-framework-hunit >= 0.2.7 && < 0.3,
+                       test-framework >= 0.6 && < 0.9,
+                       test-framework-quickcheck2 >= 0.3.0 && < 0.4,
+                       test-framework-hunit >= 0.3.0 && < 0.4,
                        binary >= 0.5.1.0
