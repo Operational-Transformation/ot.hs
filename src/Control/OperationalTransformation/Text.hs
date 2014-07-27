@@ -17,7 +17,6 @@ import qualified Data.Text as T
 import Data.Monoid (mappend)
 import Data.Aeson (Value (..), FromJSON (..), ToJSON (..), (.=), object, (.:))
 import Data.Binary (Binary (..), putWord8, getWord8)
-import Data.Attoparsec.Number (Number (..))
 import Data.Typeable (Typeable)
 import Data.Text (pack, unpack)
 import Control.Applicative ((<$>), (<*>))
@@ -41,13 +40,17 @@ instance Binary Action where
       _ -> Delete <$> get
 
 instance ToJSON Action where
-  toJSON (Retain n) = Number $ I (toInteger n)
+  toJSON (Retain n) = Number $ fromIntegral n
   toJSON (Insert t) = String t
-  toJSON (Delete n) = Number $ I (toInteger (-n))
+  toJSON (Delete n) = Number $ fromIntegral (-n)
 
 instance FromJSON Action where
-  parseJSON (Number (I n)) | n > 0 = return $ Retain (fromInteger n)
-                           | n < 0 = return $ Delete (fromInteger (-n))
+  parseJSON (Number x) = do
+    n <- parseJSON (Number x)
+    case compare n 0 of
+      GT -> return $ Retain (fromInteger n)
+      LT -> return $ Delete (fromInteger (-n))
+      EQ -> fail "integer must not be zero"
   parseJSON (String i) = return $ Insert i
   parseJSON _ = fail "expected a non-zero integer or a string"
 
