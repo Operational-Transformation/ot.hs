@@ -7,7 +7,6 @@ module Control.OperationalTransformation
   ) where
 
 import Control.Monad (foldM)
-import Control.Monad.Instances ()
 
 class OTOperation op where
   -- | Transforms two concurrent operations /a/ and /b/, producing /a'/ and /b'/ 

@@ -31,7 +31,7 @@ Library
                        text >= 1.0 && < 1.2,
                        aeson >= 0.7 && < 0.9,
                        attoparsec >= 0.10.1.1 && < 1,
-                       QuickCheck >= 2.5 && < 2.8,
+                       QuickCheck >= 2.7 && < 2.8,
                        binary >= 0.6.0.0 && < 0.8
 
   -- Modules not exported by this package.
