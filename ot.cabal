@@ -34,7 +34,7 @@ Test-suite tests
   Ghc-options:         -Wall -rtsopts
   Hs-source-dirs:      test
   type:                exitcode-stdio-1.0
-  main-is:             TestSuite.hs
+  main-is:             Main.hs
   Build-depends:       ot,
                        QuickCheck,
                        HUnit,
