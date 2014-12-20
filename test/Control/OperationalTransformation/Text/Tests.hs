@@ -30,12 +30,6 @@ instance Arbitrary T.Text where
 instance Arbitrary TextOperation where
   arbitrary = arbitrary >>= genOperation
 
-instance Arbitrary Cursor where
-  arbitrary = Cursor <$> (abs <$> arbitrary) <*> (abs <$> arbitrary)
-
-instance Arbitrary AugmentedTextOperation where
-  arbitrary = AugmentedTextOperation <$> arbitrary <*> arbitrary
-
 genOperation :: T.Text -> Gen TextOperation
 genOperation = liftM TextOperation . gen
   where
@@ -56,7 +50,7 @@ deltaLength (TextOperation ops) = sum (map len ops)
         len (Insert i) = T.length i
         len (Delete d) = -d
 
-prop_json_id :: AugmentedTextOperation -> Bool
+prop_json_id :: TextOperation -> Bool
 prop_json_id o = parseMaybe parseJSON (toJSON o) == Just o
 
 prop_binary_id :: TextOperation -> Bool
@@ -112,33 +106,6 @@ prop_invert doc = do
       Left _ -> False
       Right doc2 -> doc2 == doc
 
-testUpdateCursor :: Assertion
-testUpdateCursor = do
-  let cursor = Cursor 3 7
-  Cursor 8 10 @=? updateCursor cursor (TextOperation [Retain 3, Insert "lorem", Delete 2, Retain 42])
-  Cursor 0 0  @=? updateCursor cursor (TextOperation [Delete 45])
-
-testTransformAugmented :: Assertion
-testTransformAugmented = (a' @=? a'') >> (b' @=? b'')
-  where
-    a  = AugmentedTextOperation (Cursor 5  5)  (TextOperation [Delete 5, Retain 10])
-    b  = AugmentedTextOperation (Cursor 10 15) (TextOperation [Retain 10, Insert "lorem", Retain 5])
-    a' = AugmentedTextOperation (Cursor 10 10) (TextOperation [Delete 5, Retain 15])
-    b' = AugmentedTextOperation (Cursor 5  10) (TextOperation [Retain 5, Insert "lorem", Retain 5])
-    Right (a'', b'') = a `transform` b
-
-testComposeAugmented :: Assertion
-testComposeAugmented = ab @=? ab'
-  where
-    a  = AugmentedTextOperation (Cursor 11 11) (TextOperation [Retain 5, Insert " Ipsum"])
-    b  = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Insert "L", Delete 1, Retain 10])
-    ab = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Delete 1, Insert "L", Retain 4, Insert " Ipsum"])
-    Right ab' = a `compose` b
-
-testApplyAugmented :: Assertion
-testApplyAugmented = apply op ("lorem" :: T.Text) @=? Right "lorem ipsum"
-  where op = AugmentedTextOperation (Cursor 0 2) (TextOperation [Retain 5, Insert " ipsum"])
-
 tests :: Test
 tests = testGroup "Control.OperationalTransformation.Text.Tests"
   [ testProperty "prop_json_id" prop_json_id
@@ -153,8 +120,4 @@ tests = testGroup "Control.OperationalTransformation.Text.Tests"
   , testProperty "prop_compose_well_formed" prop_compose_well_formed
   , testProperty "prop_transform_well_formed" prop_transform_well_formed
   , testProperty "prop_invert" prop_invert
-  , testCase "testUpdateCursor" testUpdateCursor
-  , testCase "testTransformAugmented" testTransformAugmented
-  , testCase "testComposeAugmented" testComposeAugmented
-  , testCase "testApplyAugmented" testApplyAugmented
   ]

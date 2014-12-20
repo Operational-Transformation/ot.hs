@@ -3,6 +3,7 @@
 module Control.OperationalTransformation
   ( OTOperation (..)
   , OTComposableOperation (..)
+  , OTCursor (..)
   , OTSystem (..)
   ) where
 
@@ -38,11 +39,35 @@ instance (OTOperation op) => OTOperation [op] where
         (os', ps'') <- transformList2 os ps'
         return (o':os', ps'')
 
+-- | Cursor position
+class OTCursor cursor op where
+  updateCursor :: op -> cursor -> cursor
+
+
 instance (OTOperation op) => OTComposableOperation [op] where
   compose a b = return $ a ++ b
 
 instance (OTSystem doc op) => OTSystem doc [op] where
   apply = flip $ foldM $ flip apply
+
+
+instance OTCursor () op where
+  updateCursor _ _ = ()
+
+instance OTCursor cursor op => OTCursor [cursor] op where
+  updateCursor op = map (updateCursor op)
+
+instance (OTCursor a op, OTCursor b op) => OTCursor (a, b) op where
+  updateCursor op (a, b) = (updateCursor op a, updateCursor op b)
+
+instance (OTCursor a op, OTCursor b op, OTCursor c op) => OTCursor (a, b, c) op where
+  updateCursor op (a, b, c) = (updateCursor op a, updateCursor op b, updateCursor op c)
+
+instance (OTCursor a op, OTCursor b op, OTCursor c op, OTCursor d op) => OTCursor (a, b, c, d) op where
+  updateCursor op (a, b, c, d) = (updateCursor op a, updateCursor op b, updateCursor op c, updateCursor op d)
+
+instance (OTCursor a op, OTCursor b op, OTCursor c op, OTCursor d op, OTCursor e op) => OTCursor (a, b, c, d, e) op where
+  updateCursor op (a, b, c, d, e) = (updateCursor op a, updateCursor op b, updateCursor op c, updateCursor op d, updateCursor op e)
 
 
 instance (OTOperation a, OTOperation b) => OTOperation (a, b) where

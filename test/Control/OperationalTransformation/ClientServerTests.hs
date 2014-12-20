@@ -73,7 +73,7 @@ prop_client_server genOp = property $ do
           return (server, replace clientN client' clients)
         1 | canSend client -> do
           let ((rev, op), client') = sendClient client
-              Right (op', server') = applyOperation server rev op
+              Right (op', (), server') = applyOperation server rev op ()
               clients' = replace clientN client' clients
               clients'' = broadcast (clientId client) op' clients'
           return (server', clients'')
