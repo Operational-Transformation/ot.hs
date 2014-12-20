@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE StandaloneDeriving, GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings, OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Control.OperationalTransformation.Selection.Tests (tests) where
 
@@ -33,39 +33,14 @@ testUpdateRange = do
 
 testUpdateSelection :: Assertion
 testUpdateSelection =
-  let sel = [Range 2 4, Range 6 8] :: Selection
-  in [Range 2 6, Range 8 8] @=? updateCursor (TextOperation [Retain 3, Insert "hi", Retain 3, Delete 2]) sel
-
-{-
-testUpdateCursor :: Assertion
-testUpdateCursor = do
-
-testTransformAugmented :: Assertion
-testTransformAugmented = (a' @=? a'') >> (b' @=? b'')
-  where
-    a  = AugmentedTextOperation (Cursor 5  5)  (TextOperation [Delete 5, Retain 10])
-    b  = AugmentedTextOperation (Cursor 10 15) (TextOperation [Retain 10, Insert "lorem", Retain 5])
-    a' = AugmentedTextOperation (Cursor 10 10) (TextOperation [Delete 5, Retain 15])
-    b' = AugmentedTextOperation (Cursor 5  10) (TextOperation [Retain 5, Insert "lorem", Retain 5])
-    Right (a'', b'') = a `transform` b
-
-testComposeAugmented :: Assertion
-testComposeAugmented = ab @=? ab'
-  where
-    a  = AugmentedTextOperation (Cursor 11 11) (TextOperation [Retain 5, Insert " Ipsum"])
-    b  = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Insert "L", Delete 1, Retain 10])
-    ab = AugmentedTextOperation (Cursor 0 1)   (TextOperation [Delete 1, Insert "L", Retain 4, Insert " Ipsum"])
-    Right ab' = a `compose` b
-
-testApplyAugmented :: Assertion
-testApplyAugmented = apply op ("lorem" :: T.Text) @=? Right "lorem ipsum"
-  where op = AugmentedTextOperation (Cursor 0 2) (TextOperation [Retain 5, Insert " ipsum"])
--}
+  let sel = Selection [Range 2 4, Range 6 8]
+  in Selection [Range 2 6, Range 8 8] @=?
+     updateCursor (TextOperation [Retain 3, Insert "hi", Retain 3, Delete 2]) sel
 
 testSize :: Assertion
 testSize = do
   size (createCursor 5) @=? 0
-  size [Range 5 8, Range 10 20] @=? 13
+  size (Selection [Range 5 8, Range 10 20]) @=? 13
 
 prop_sizeNotNegative :: Selection -> Bool
 prop_sizeNotNegative sel = size sel >= 0

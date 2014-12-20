@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, OverloadedStrings, OverloadedLists #-}
+{-# LANGUAGE TypeFamilies, OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses #-}
 
 module Control.OperationalTransformation.Selection
@@ -78,7 +78,7 @@ instance IsList Selection where
 
 -- | Create a selection that represents a cursor.
 createCursor :: Int -> Selection
-createCursor i = [Range i i]
+createCursor i = Selection [Range i i]
 
 -- | Does the selection contain any characters?
 somethingSelected :: Selection -> Bool
