@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses #-}
+{-# LANGUAGE CPP, OverloadedStrings, MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable, FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts, UndecidableInstances, TypeFamilies #-}
 
@@ -18,8 +18,9 @@ import Data.Binary (Binary (..), putWord8, getWord8)
 import Data.Typeable (Typeable)
 import Data.Text (pack, unpack)
 import Control.Applicative ((<$>))
+#if MIN_VERSION_ghc(7,8,0)
 import GHC.Exts (IsList (..))
-
+#endif
 
 -- | An action changes the text at the current position or advances the cursor.
 data Action = Retain !Int    -- ^ Skip the next n characters.
@@ -59,10 +60,12 @@ instance FromJSON Action where
 -- document.
 newtype TextOperation = TextOperation [Action] deriving (Read, Show, Binary, Typeable, FromJSON, ToJSON)
 
+#if MIN_VERSION_ghc(7,8,0)
 instance IsList TextOperation where
   type Item TextOperation = Action
   fromList = TextOperation
   toList (TextOperation as) = as
+#endif
 
 addRetain :: Int -> [Action] -> [Action]
 addRetain n (Retain m : xs) = Retain (n+m) : xs

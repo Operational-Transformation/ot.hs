@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, OverloadedStrings #-}
+{-# LANGUAGE CPP, TypeFamilies, OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses #-}
 
 module Control.OperationalTransformation.Selection
@@ -12,11 +12,13 @@ module Control.OperationalTransformation.Selection
 import Control.OperationalTransformation
 import Control.OperationalTransformation.Text
 import Data.Aeson
-import GHC.Exts (IsList (..))
 import Control.Applicative
 import Data.Monoid
 import Data.List (sort)
 import qualified Data.Text as T
+#if MIN_VERSION_ghc(7,8,0)
+import GHC.Exts (IsList (..))
+#endif
 
 -- | Range has `anchor` and `head` properties, which are zero-based indices into
 -- the document. The `anchor` is the side of the selection that stays fixed,
@@ -71,10 +73,12 @@ instance FromJSON Selection where
   parseJSON (Object o) = Selection <$> o .: "ranges"
   parseJSON _ = fail "expected an object"
 
+#if MIN_VERSION_ghc(7,8,0)
 instance IsList Selection where
   type Item Selection = Range
   fromList = Selection
   toList = ranges
+#endif
 
 -- | Create a selection that represents a cursor.
 createCursor :: Int -> Selection
