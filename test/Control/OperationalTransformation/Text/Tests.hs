@@ -1,52 +1,28 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, DataKinds #-}
 
 module Control.OperationalTransformation.Text.Tests
   ( tests
-  , genOperation
   ) where
 
 import Control.OperationalTransformation
 import Control.OperationalTransformation.Text
 import Control.OperationalTransformation.Properties
 
+import Control.OperationalTransformation.Text.Gen
+
 import Test.QuickCheck hiding (Result)
 import Test.QuickCheck.Property
-import Test.HUnit hiding (Test)
 import Test.Framework
 import Test.Framework.Providers.QuickCheck2 (testProperty)
-import Test.Framework.Providers.HUnit (testCase)
 
 import qualified Data.Text as T
-import Data.String (fromString)
 import Data.Binary (encode, decode)
-import Control.Monad (liftM, liftM2)
 import Control.Applicative ((<$>), (<*>))
 import Data.Aeson.Types hiding (Result)
 
-instance Arbitrary T.Text where
-  arbitrary = liftM fromString arbitrary
-
-instance Arbitrary TextOperation where
-  arbitrary = arbitrary >>= genOperation
-
-genOperation :: T.Text -> Gen TextOperation
-genOperation = liftM TextOperation . gen
-  where
-    gen "" = oneof [return [], liftM ((:[]) . Insert) (arbitraryText maxLength)]
-    gen s = do
-      len <- choose (1, min maxLength (T.length s))
-      oneof [ liftM (Retain len :) $ gen (T.drop len s)
-            , do s2 <- arbitraryText len
-                 liftM (Insert s2 :) $ gen s
-            , liftM (Delete len :) $ gen (T.drop len s)
-            ]
-    maxLength = 32
-    arbitraryText n = liftM (fromString . take n) $ listOf1 arbitrary
-
 deltaLength :: TextOperation -> Int
 deltaLength (TextOperation ops) = sum (map len ops)
-  where len (Retain _)   = 0
+  where len (Retain _) = 0
         len (Insert i) = T.length i
         len (Delete d) = -d
 
@@ -100,7 +76,7 @@ wellFormed (TextOperation ops) = all (not . nullLength) ops
 prop_invert :: T.Text -> Gen Bool
 prop_invert doc = do
   op <- genOperation doc
-  return $ case liftM2 (,) (invertOperation op doc) (apply op doc) of
+  return $ case (,) <$> invertOperation op doc <*> apply op doc of
     Left _ -> False
     Right (invOp, doc') -> case apply invOp doc' of
       Left _ -> False
@@ -110,10 +86,11 @@ tests :: Test
 tests = testGroup "Control.OperationalTransformation.Text.Tests"
   [ testProperty "prop_json_id" prop_json_id
   , testProperty "prop_binary_id" prop_binary_id
-  , testProperty "prop_compose_apply" $ prop_compose_apply genOperation
-  , testProperty "prop_transform_apply" $ prop_transform_apply genOperation
-  , testProperty "prop_transform_compose" $ prop_transform_compose genOperation
-  -- prop_transform_compose_compat_l and prop_transform_compose_compat_r
+  , testProperty "prop_compose_assoc" (prop_compose_assoc :: DocHistory T.Text TextOperation Three -> Result)
+  , testProperty "prop_compose_apply" (prop_apply_functorial :: DocHistory T.Text TextOperation Two -> Result)
+  , testProperty "prop_transform_apply_comm" (prop_transform_apply_comm :: ConcurrentDocHistories T.Text TextOperation One One -> Result)
+  , testProperty "prop_transform_comm" (prop_transform_comm :: ConcurrentDocHistories T.Text TextOperation One One -> Result)
+  -- prop_transform_compose_compat_l, prop_transform_compose_compat_r and prop_transform_functorial
   -- are /not/ supported.
   , testProperty "prop_apply_length" prop_apply_length
   , testProperty "prop_compose_length" prop_compose_length

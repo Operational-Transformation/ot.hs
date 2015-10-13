@@ -176,9 +176,10 @@ instance OTSystem T.Text TextOperation where
       loop _ _ _ = Left "operation can't be applied to the document: text is longer than the operation"
 
 -- | Computes the inverse of an operation. Useful for implementing undo.
-invertOperation :: TextOperation               -- ^ An operation
-                -> T.Text                      -- ^ Document to apply the operation to
-                -> Either String TextOperation
+invertOperation
+  :: TextOperation               -- ^ An operation
+  -> T.Text                      -- ^ Document to apply the operation to
+  -> Either String TextOperation
 invertOperation (TextOperation actions) doc = loop actions doc []
   where
     loop (op:ops) text inv = case op of

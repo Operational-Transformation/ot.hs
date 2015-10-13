@@ -9,7 +9,7 @@ import Control.OperationalTransformation.Client
 import Control.OperationalTransformation.Server
 import Data.Maybe (fromJust)
 
-import Control.OperationalTransformation.Text.Tests (genOperation)
+import Control.OperationalTransformation.Text.Gen (genOperation)
 
 import Test.Framework
 import Test.Framework.Providers.QuickCheck2
