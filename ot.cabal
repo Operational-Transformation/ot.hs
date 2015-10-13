@@ -1,8 +1,7 @@
 Name:                ot
 Version:             0.2.1.0
 Synopsis:            Real-time collaborative editing with Operational Transformation
--- A longer description of the package.
--- Description:         
+Description:         OT is a technique to handle changes to a document in a setting where users are editing concurrently. This package implements operational transformation for simple plain text documents as well as server and client modules.
 Homepage:            https://github.com/operational-transformation/ot.hs
 License:             MIT
 License-file:        LICENSE
