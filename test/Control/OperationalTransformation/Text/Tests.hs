@@ -17,8 +17,7 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 import qualified Data.Text as T
 import Data.Binary (encode, decode)
-import Control.Applicative ((<$>), (<*>))
-import Data.Aeson.Types hiding (Result)
+import Data.Aeson.Types hiding (Result, One)
 
 deltaLength :: TextOperation -> Int
 deltaLength (TextOperation ops) = sum (map len ops)

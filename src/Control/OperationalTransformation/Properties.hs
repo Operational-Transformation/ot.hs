@@ -45,7 +45,7 @@ genOp :: (OTSystem doc op, ArbitraryFor doc op) => doc -> Gen (op, doc)
 genOp doc = do
   op <- arbitraryFor doc
   case apply op doc of
-    Left err -> fail err
+    Left err -> error err
     Right doc' -> return (op, doc')
 
 

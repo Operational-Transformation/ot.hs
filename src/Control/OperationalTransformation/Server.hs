@@ -6,8 +6,9 @@ module Control.OperationalTransformation.Server
   ) where
 
 import Control.OperationalTransformation
-import Control.Monad.Trans.Either
+import Control.Monad.Trans.Except
 import Control.Monad.Identity
+import Control.Monad (foldM)
 
 type Revision = Integer
 
@@ -34,16 +35,16 @@ applyOperation :: (OTSystem doc op, OTCursor cursor op)
                -- operation; that client must be sent an acknowledgement) and
                -- the new state (or an error).
 applyOperation (ServerState rev doc ops) oprev op cursor =
-  runIdentity $ runEitherT $ do
+  runIdentity $ runExceptT $ do
     concurrentOps <- if oprev > rev || rev - oprev > fromIntegral (length ops)
-      then fail "unknown revision number"
+      then throwE "unknown revision number"
       else return $ take (fromInteger $ rev - oprev) ops
     (op', cursor') <- foldM transformFst (op, cursor) (reverse concurrentOps)
     doc' <- case apply op' doc of
-      Left err -> fail $ "apply failed: " ++ err
+      Left err -> throwE $ "apply failed: " ++ err
       Right d -> return d
     return $ (op', cursor', ServerState (rev+1) doc' (op':ops))
     where
       transformFst (a, curs) b = case transform a b of
-        Left err -> fail $ "transform failed: " ++ err
+        Left err -> throwE $ "transform failed: " ++ err
         Right (a', _) -> return (a', updateCursor op curs)

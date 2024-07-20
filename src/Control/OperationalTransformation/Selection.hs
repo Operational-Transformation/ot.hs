@@ -12,8 +12,6 @@ module Control.OperationalTransformation.Selection
 import Control.OperationalTransformation
 import Control.OperationalTransformation.Text
 import Data.Aeson
-import Control.Applicative
-import Data.Monoid
 import Data.List (sort)
 import qualified Data.Text as T
 #if MIN_VERSION_ghc(7,8,0)
@@ -55,7 +53,7 @@ instance OTCursor Range TextOperation where
 -- | A selection consists of a list of ranges. Each range may represent a
 -- selected part of the document or a cursor in the document.
 newtype Selection = Selection { ranges :: [Range] }
-  deriving (Monoid, Show, Read)
+  deriving (Semigroup, Monoid, Show, Read)
 
 instance OTCursor Selection TextOperation where
   updateCursor op = Selection . updateCursor op . ranges
